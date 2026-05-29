@@ -11,6 +11,7 @@ composeBom = "2024.06.00"
 hilt = "2.51.1"
 hiltNavigationCompose = "1.2.0"
 navEvent = "1.0.0"
+navigationCompose = "2.7.7" # Ou a versão mais estável que preferir
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -33,6 +34,7 @@ hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-com
 androidx-navigationevent = { group = "androidx.navigationevent", name = "navigationevent", version.ref = "navEvent" }
 androidx-navigationevent-compose = { group = "androidx.navigationevent", name = "navigationevent-compose", version.ref = "navEvent" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
