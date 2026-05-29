@@ -1,4 +1,5 @@
 package com.rodrigo.androidapp.futtrack.presentation.navigation
+import com.rodrigo.androidapp.futtrack.presentation.match.MatchRoute
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,10 +66,10 @@ fun FuttrakMainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Teams.route) {
-                TeamListRoute() // A nossa tela de times que já está pronta!
+                TeamListRoute()
             }
             composable(BottomNavItem.Matches.route) {
-                PlaceholderScreen("Partidas")
+                MatchRoute()
             }
             composable(BottomNavItem.Standings.route) {
                 PlaceholderScreen("Tabela")
