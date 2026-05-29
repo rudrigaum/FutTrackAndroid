@@ -25,4 +25,12 @@ class MatchRepositoryImpl : MatchRepository {
             currentMatches.filterNot { it.id == matchId }
         }
     }
+
+    override suspend fun updateMatch(match: Match) {
+        matchesFlow.update { currentMatches ->
+            currentMatches.map { existingMatch ->
+                if (existingMatch.id == match.id) match else existingMatch
+            }
+        }
+    }
 }
