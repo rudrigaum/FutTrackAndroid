@@ -38,7 +38,7 @@ class MatchViewModel @Inject constructor(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000), // Mantém vivo por 5s após a View sumir (evita recarregamento ao rotacionar tela)
+        started = SharingStarted.WhileSubscribed(5000),
         initialValue = MatchUiState(isLoading = true)
     )
 
@@ -50,6 +50,12 @@ class MatchViewModel @Inject constructor(
                 date = date
             )
             matchRepository.scheduleMatch(newMatch)
+        }
+    }
+
+    fun deleteMatch(matchId: String) {
+        viewModelScope.launch {
+            matchRepository.deleteMatch(matchId)
         }
     }
 }

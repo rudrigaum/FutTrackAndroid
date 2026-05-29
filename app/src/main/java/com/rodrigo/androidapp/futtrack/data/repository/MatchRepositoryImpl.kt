@@ -19,4 +19,10 @@ class MatchRepositoryImpl : MatchRepository {
             currentMatches + match
         }
     }
+
+    override suspend fun deleteMatch(matchId: String) {
+        matchesFlow.update { currentMatches ->
+            currentMatches.filterNot { it.id == matchId }
+        }
+    }
 }

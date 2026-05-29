@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -16,6 +18,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -45,9 +49,12 @@ fun MatchRoute(
     MatchScreen(
         uiState = uiState,
         onScheduleMatch = { home, away ->
-            // Para o MVP, estamos agendando o jogo automaticamente para o dia seguinte
             val tomorrow = LocalDateTime.now().plusDays(1)
             viewModel.scheduleNewMatch(home.id, away.id, tomorrow)
+        },
+        // Nova action passada da UI para a ViewModel
+        onDeleteMatch = { matchId ->
+            viewModel.deleteMatch(matchId)
         }
     )
 }
@@ -56,7 +63,8 @@ fun MatchRoute(
 @Composable
 fun MatchScreen(
     uiState: MatchUiState,
-    onScheduleMatch: (Team, Team) -> Unit
+    onScheduleMatch: (Team, Team) -> Unit,
+    onDeleteMatch: (String) -> Unit // Novo parâmetro
 ) {
     var expandedHome by remember { mutableStateOf(false) }
     var selectedHome by remember { mutableStateOf<Team?>(null) }
@@ -132,7 +140,13 @@ fun MatchScreen(
                         val homeName = uiState.availableTeams.find { it.id == match.homeTeamId }?.name ?: "Desconhecido"
                         val awayName = uiState.availableTeams.find { it.id == match.awayTeamId }?.name ?: "Desconhecido"
 
-                        MatchItem(match = match, homeName = homeName, awayName = awayName)
+                        MatchItem(
+                            match = match,
+                            homeName = homeName,
+                            awayName = awayName,
+                            // Conecta o clique da lixeira à action da tela
+                            onDelete = { onDeleteMatch(match.id) }
+                        )
                     }
                 }
             }
@@ -177,26 +191,47 @@ fun TeamDropdown(
 }
 
 @Composable
-fun MatchItem(match: Match, homeName: String, awayName: String) {
+fun MatchItem(
+    match: Match,
+    homeName: String,
+    awayName: String,
+    onDelete: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = homeName, style = MaterialTheme.typography.bodyLarge)
-                Text(text = " vs ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
-                Text(text = awayName, style = MaterialTheme.typography.bodyLarge)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = homeName, style = MaterialTheme.typography.bodyLarge)
+                    Text(text = " vs ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(horizontal = 4.dp))
+                    Text(text = awayName, style = MaterialTheme.typography.bodyLarge)
+                }
+
+                val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+                Text(
+                    text = match.date.format(formatter),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
 
-            val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-            Text(
-                text = match.date.format(formatter),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Deletar Partida",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }

@@ -7,9 +7,9 @@ import kotlinx.coroutines.flow.flowOf
 
 class TeamRepositoryImpl : TeamRepository {
     private val mockTeams = listOf(
-        Team(id = "1", name = "Brazil", isoCode = "BRA"),
-        Team(id = "2", name = "Italy", isoCode = "ITA"),
-        Team(id = "3", name = "Germany", isoCode = "GER")
+        Team(id = "1", name = "Brasil", isoCode = "BRA"),
+        Team(id = "2", name = "Itália", isoCode = "ITA"),
+        Team(id = "3", name = "Alemanha", isoCode = "ALE")
     )
 
     override fun getTeams(): Flow<List<Team>> {
