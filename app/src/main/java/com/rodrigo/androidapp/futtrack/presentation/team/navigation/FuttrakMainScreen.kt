@@ -20,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rodrigo.androidapp.futtrack.presentation.team.TeamListRoute
+import com.rodrigo.androidapp.futtrack.presentation.standings.StandingsRoute
 
 @Composable
 fun FuttrakMainScreen() {
@@ -72,7 +73,7 @@ fun FuttrakMainScreen() {
                 MatchRoute()
             }
             composable(BottomNavItem.Standings.route) {
-                PlaceholderScreen("Tabela")
+                StandingsRoute()
             }
             composable(BottomNavItem.Statistics.route) {
                 PlaceholderScreen("Estatísticas")

@@ -7,4 +7,5 @@ interface MatchRepository {
     fun getMatches(): Flow<List<Match>>
     suspend fun scheduleMatch(match: Match)
     suspend fun deleteMatch(matchId: String)
+    suspend fun updateMatch(match: Match)
 }

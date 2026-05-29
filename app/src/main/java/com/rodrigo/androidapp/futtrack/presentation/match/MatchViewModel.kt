@@ -3,6 +3,7 @@ package com.rodrigo.androidapp.futtrack.presentation.match
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rodrigo.androidapp.futtrack.domain.model.Match
+import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.Team
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
 import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
@@ -56,6 +57,20 @@ class MatchViewModel @Inject constructor(
     fun deleteMatch(matchId: String) {
         viewModelScope.launch {
             matchRepository.deleteMatch(matchId)
+        }
+    }
+
+    fun finishMatch(matchId: String, homeScore: Int, awayScore: Int) {
+        viewModelScope.launch {
+            val match = uiState.value.scheduledMatches.find { it.id == matchId }
+            if (match != null) {
+                val updatedMatch = match.copy(
+                    homeScore = homeScore,
+                    awayScore = awayScore,
+                    status = MatchStatus.FINISHED
+                )
+                matchRepository.updateMatch(updatedMatch)
+            }
         }
     }
 }
