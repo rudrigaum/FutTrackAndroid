@@ -4,7 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,18 +27,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rodrigo.androidapp.futtrack.domain.model.Player
 import com.rodrigo.androidapp.futtrack.domain.model.Team
 
 @Composable
-fun TeamListRoute(
+fun TeamRoute(
     viewModel: TeamViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    TeamListScreen(
+    TeamScreen(
         uiState = uiState,
         onTeamClick = { teamId ->
             viewModel.loadPlayersForTeam(teamId)
@@ -53,52 +53,57 @@ fun TeamListRoute(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TeamListScreen(
+fun TeamScreen(
     uiState: TeamUiState,
     onTeamClick: (String) -> Unit,
     onDismissDialog: () -> Unit
 ) {
-    // Estado local para sabermos qual time está selecionado no modal
+    // Estado local para sabermos qual time está selecionado no momento
     var selectedTeam by remember { mutableStateOf<Team?>(null) }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Baba Amigos do Lelé") }
-            )
-        }
+        topBar = { TopAppBar(title = { Text("Times") }) }
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentAlignment = Alignment.Center
-        ) {
-            // Estrutura atualizada para a Data Class da ViewModel
-            if (uiState.isLoading) {
+        if (uiState.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    items(uiState.teams) { team ->
-                        TeamItem(
-                            team = team,
-                            onClick = {
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(uiState.teams) { team ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
                                 selectedTeam = team
                                 onTeamClick(team.id)
                             }
-                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = team.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    // Modal exibindo o elenco do time selecionado
+    // Modal exibindo os jogadores
     if (selectedTeam != null) {
         AlertDialog(
             onDismissRequest = {
@@ -133,33 +138,5 @@ fun TeamListScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-fun TeamItem(team: Team, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }, // Adicionamos a ação de clique aqui!
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = team.isoCode,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(end = 16.dp)
-            )
-            Text(
-                text = team.name,
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
     }
 }

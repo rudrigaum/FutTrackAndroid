@@ -2,42 +2,58 @@ package com.rodrigo.androidapp.futtrack.presentation.team
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rodrigo.androidapp.futtrack.domain.model.Player
 import com.rodrigo.androidapp.futtrack.domain.model.Team
+import com.rodrigo.androidapp.futtrack.domain.repository.PlayerRepository
 import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-sealed interface TeamUiState {
-    data object Loading : TeamUiState
-    data class Success(val teams: List<Team>) : TeamUiState
-    data class Error(val message: String) : TeamUiState
-}
+data class TeamUiState(
+    val teams: List<Team> = emptyList(),
+    val isLoading: Boolean = true,
+    val selectedTeamPlayers: List<Player> = emptyList() // Adicionamos a lista de jogadores aqui
+)
 
 @HiltViewModel
 class TeamViewModel @Inject constructor(
-    private val teamRepository: TeamRepository
+    private val teamRepository: TeamRepository,
+    private val playerRepository: PlayerRepository // Injetamos o repositório de jogadores
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<TeamUiState>(TeamUiState.Loading)
+    private val _uiState = MutableStateFlow(TeamUiState())
     val uiState: StateFlow<TeamUiState> = _uiState.asStateFlow()
 
+    private var playersJob: Job? = null
+
     init {
-        fetchTeams()
+        loadTeams()
     }
 
-    private fun fetchTeams() {
+    private fun loadTeams() {
         viewModelScope.launch {
-            try {
-                teamRepository.getTeams().collect { teams ->
-                    _uiState.value = TeamUiState.Success(teams)
-                }
-            } catch (e: Exception) {
-                _uiState.value = TeamUiState.Error(message = "Erro ao carregar times: ${e.message}")
+            teamRepository.getTeams().collect { teamList ->
+                _uiState.update { it.copy(teams = teamList, isLoading = false) }
             }
         }
+    }
+
+    fun loadPlayersForTeam(teamId: String) {
+        playersJob?.cancel()
+        playersJob = viewModelScope.launch {
+            playerRepository.getPlayersByTeam(teamId).collect { players ->
+                _uiState.update { it.copy(selectedTeamPlayers = players) }
+            }
+        }
+    }
+
+    fun clearSelectedPlayers() {
+        _uiState.update { it.copy(selectedTeamPlayers = emptyList()) }
     }
 }
