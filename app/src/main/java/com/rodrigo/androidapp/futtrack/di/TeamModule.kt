@@ -1,6 +1,7 @@
 package com.rodrigo.androidapp.futtrack.di
 
 import com.rodrigo.androidapp.futtrack.data.local.dao.TeamDao
+import com.rodrigo.androidapp.futtrack.data.local.dao.PlayerDao
 import com.rodrigo.androidapp.futtrack.data.repository.TeamRepositoryImpl
 import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
 import dagger.Module
@@ -15,7 +16,7 @@ object TeamModule {
 
     @Provides
     @Singleton
-    fun provideTeamRepository(dao: TeamDao): TeamRepository {
-        return TeamRepositoryImpl(dao)
+    fun provideTeamRepository(teamDao: TeamDao, playerDao: PlayerDao): TeamRepository {
+        return TeamRepositoryImpl(teamDao, playerDao)
     }
 }
