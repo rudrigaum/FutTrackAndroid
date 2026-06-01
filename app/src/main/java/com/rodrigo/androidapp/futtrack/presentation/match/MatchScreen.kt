@@ -1,5 +1,6 @@
 package com.rodrigo.androidapp.futtrack.presentation.match
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,12 +12,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -27,9 +31,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -42,12 +48,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rodrigo.androidapp.futtrack.core.AppConfig // IMPORT DO CADEADO
+import com.rodrigo.androidapp.futtrack.core.AppConfig
 import com.rodrigo.androidapp.futtrack.domain.model.Match
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.Team
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun MatchRoute(
@@ -57,9 +67,9 @@ fun MatchRoute(
 
     MatchScreen(
         uiState = uiState,
-        onScheduleMatch = { home, away ->
-            val tomorrow = LocalDateTime.now().plusDays(1)
-            viewModel.scheduleNewMatch(home.id, away.id, tomorrow)
+        // Agora recebemos a data escolhida no Date Picker
+        onScheduleMatch = { home, away, date ->
+            viewModel.scheduleNewMatch(home.id, away.id, date)
         },
         onDeleteMatch = { matchId ->
             viewModel.deleteMatch(matchId)
@@ -70,21 +80,43 @@ fun MatchRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MatchScreen(
     uiState: MatchUiState,
-    onScheduleMatch: (Team, Team) -> Unit,
+    onScheduleMatch: (Team, Team, LocalDateTime) -> Unit,
     onDeleteMatch: (String) -> Unit,
     onFinishMatch: (String, Int, Int) -> Unit
 ) {
     var expandedHome by remember { mutableStateOf(false) }
     var selectedHome by remember { mutableStateOf<Team?>(null) }
-
     var expandedAway by remember { mutableStateOf(false) }
     var selectedAway by remember { mutableStateOf<Team?>(null) }
-
+    var showDatePicker by remember { mutableStateOf(false) }
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    val datePickerState = rememberDatePickerState()
     var matchToScore by remember { mutableStateOf<Match?>(null) }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        selectedDate = Instant.ofEpochMilli(millis)
+                            .atZone(ZoneId.of("UTC"))
+                            .toLocalDate()
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Partidas") }) }
@@ -112,16 +144,27 @@ fun MatchScreen(
                             TeamDropdown("Time Mandante", uiState.availableTeams, selectedHome, expandedHome, { expandedHome = it }) { selectedHome = it; expandedHome = false }
                             TeamDropdown("Time Visitante", uiState.availableTeams, selectedAway, expandedAway, { expandedAway = it }) { selectedAway = it; expandedAway = false }
 
+                            OutlinedButton(
+                                onClick = { showDatePicker = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.DateRange, contentDescription = "Calendário", modifier = Modifier.padding(end = 8.dp))
+                                Text(selectedDate?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) ?: "Selecionar Data")
+                            }
+
                             Button(
                                 onClick = {
-                                    if (selectedHome != null && selectedAway != null) {
-                                        onScheduleMatch(selectedHome!!, selectedAway!!)
+                                    if (selectedHome != null && selectedAway != null && selectedDate != null) {
+                                        val matchDateTime = selectedDate!!.atTime(9, 0)
+                                        onScheduleMatch(selectedHome!!, selectedAway!!, matchDateTime)
+
                                         selectedHome = null
                                         selectedAway = null
+                                        selectedDate = null
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                enabled = selectedHome != null && selectedAway != null && selectedHome != selectedAway
+                                enabled = selectedHome != null && selectedAway != null && selectedHome != selectedAway && selectedDate != null
                             ) {
                                 Text("Agendar")
                             }
@@ -129,20 +172,39 @@ fun MatchScreen(
                     }
                 }
 
-                Text("Jogos", style = MaterialTheme.typography.titleMedium)
+                Text("Próximos Jogos", style = MaterialTheme.typography.titleMedium)
 
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                    items(uiState.scheduledMatches) { match ->
-                        val homeName = uiState.availableTeams.find { it.id == match.homeTeamId }?.name ?: "Desconhecido"
-                        val awayName = uiState.availableTeams.find { it.id == match.awayTeamId }?.name ?: "Desconhecido"
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    uiState.groupedMatches.toSortedMap().forEach { (date, matchesForDate) ->
+                        stickyHeader {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                val dateStr = date.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", Locale("pt", "BR"))).uppercase()
+                                Text(
+                                    text = dateStr,
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
 
-                        MatchItem(
-                            match = match,
-                            homeName = homeName,
-                            awayName = awayName,
-                            onDelete = { onDeleteMatch(match.id) },
-                            onScoreClick = { matchToScore = match }
-                        )
+                        items(matchesForDate) { match ->
+                            val homeName = uiState.availableTeams.find { it.id == match.homeTeamId }?.name ?: "Desconhecido"
+                            val awayName = uiState.availableTeams.find { it.id == match.awayTeamId }?.name ?: "Desconhecido"
+
+                            Box(modifier = Modifier.padding(vertical = 4.dp)) {
+                                MatchItem(
+                                    match = match,
+                                    homeName = homeName,
+                                    awayName = awayName,
+                                    onDelete = { onDeleteMatch(match.id) },
+                                    onScoreClick = { matchToScore = match }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -197,8 +259,8 @@ fun MatchItem(match: Match, homeName: String, awayName: String, onDelete: () -> 
                     Text(text = "Finalizado", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 } else {
                     Text(text = "$homeName vs $awayName", style = MaterialTheme.typography.bodyLarge)
-                    val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-                    Text(text = match.date.format(formatter), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val formatter = DateTimeFormatter.ofPattern("HH:mm")
+                    Text(text = "Horário: ${match.date.format(formatter)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
