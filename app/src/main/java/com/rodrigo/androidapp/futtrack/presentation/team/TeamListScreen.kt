@@ -58,7 +58,6 @@ fun TeamListScreen(
     onTeamClick: (String) -> Unit,
     onDismissDialog: () -> Unit
 ) {
-    // Estado local para sabermos qual time está selecionado no modal
     var selectedTeam by remember { mutableStateOf<Team?>(null) }
 
     Scaffold(
@@ -74,7 +73,6 @@ fun TeamListScreen(
                 .padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
-            // Estrutura atualizada para a Data Class da ViewModel
             if (uiState.isLoading) {
                 CircularProgressIndicator()
             } else {
@@ -98,7 +96,6 @@ fun TeamListScreen(
         }
     }
 
-    // Modal exibindo o elenco do time selecionado
     if (selectedTeam != null) {
         AlertDialog(
             onDismissRequest = {
@@ -114,7 +111,7 @@ fun TeamListScreen(
                         items(uiState.selectedTeamPlayers) { player ->
                             Column {
                                 Text(
-                                    text = "${player.name} ${if (player.isGoalkeeper) "(GOL)" else ""}",
+                                    text = "${player.number?.let { "#$it - " } ?: ""}${player.name} ${if (player.isGoalkeeper) "(GOL)" else ""}",
                                     modifier = Modifier.padding(vertical = 8.dp),
                                     style = MaterialTheme.typography.bodyLarge
                                 )

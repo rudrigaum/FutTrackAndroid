@@ -1,8 +1,6 @@
 package com.rodrigo.androidapp.futtrack.di
 
 import com.google.firebase.firestore.FirebaseFirestore
-import com.rodrigo.androidapp.futtrack.data.repository.TeamRepositoryFirebaseImpl
-import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -11,11 +9,11 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object TeamModule {
+object FirebaseModule {
 
     @Provides
     @Singleton
-    fun provideTeamRepository(firestore: FirebaseFirestore): TeamRepository {
-        return TeamRepositoryFirebaseImpl(firestore)
+    fun provideFirestore(): FirebaseFirestore {
+        return FirebaseFirestore.getInstance()
     }
 }
