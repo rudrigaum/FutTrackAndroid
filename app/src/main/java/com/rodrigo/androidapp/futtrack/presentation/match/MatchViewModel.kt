@@ -13,13 +13,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.LocalDateTime
 import javax.inject.Inject
 
 data class MatchUiState(
     val isLoading: Boolean = true,
     val availableTeams: List<Team> = emptyList(),
-    val scheduledMatches: List<Match> = emptyList()
+    // Agora enviamos para a tela um mapa agrupado pela data
+    val groupedMatches: Map<LocalDate, List<Match>> = emptyMap()
 )
 
 @HiltViewModel
@@ -28,14 +30,20 @@ class MatchViewModel @Inject constructor(
     private val matchRepository: MatchRepository
 ) : ViewModel() {
 
+    private val cutoffDate = LocalDateTime.of(2026, 5, 31, 23, 59)
+
     val uiState: StateFlow<MatchUiState> = combine(
         teamRepository.getTeams(),
         matchRepository.getMatches()
     ) { teams, matches ->
+
+        val visibleMatches = matches.filter { it.date.isAfter(cutoffDate) }
+        val grouped = visibleMatches.groupBy { it.date.toLocalDate() }
+
         MatchUiState(
             isLoading = false,
             availableTeams = teams,
-            scheduledMatches = matches
+            groupedMatches = grouped
         )
     }.stateIn(
         scope = viewModelScope,
@@ -62,7 +70,8 @@ class MatchViewModel @Inject constructor(
 
     fun finishMatch(matchId: String, homeScore: Int, awayScore: Int) {
         viewModelScope.launch {
-            val match = uiState.value.scheduledMatches.find { it.id == matchId }
+            val allMatches = uiState.value.groupedMatches.values.flatten()
+            val match = allMatches.find { it.id == matchId }
             if (match != null) {
                 val updatedMatch = match.copy(
                     homeScore = homeScore,
