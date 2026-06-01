@@ -1,7 +1,7 @@
 package com.rodrigo.androidapp.futtrack.di
 
-import com.rodrigo.androidapp.futtrack.data.local.dao.PlayerDao
-import com.rodrigo.androidapp.futtrack.data.repository.PlayerRepositoryImpl
+import com.google.firebase.firestore.FirebaseFirestore
+import com.rodrigo.androidapp.futtrack.data.repository.PlayerRepositoryFirebaseImpl
 import com.rodrigo.androidapp.futtrack.domain.repository.PlayerRepository
 import dagger.Module
 import dagger.Provides
@@ -15,7 +15,7 @@ object PlayerModule {
 
     @Provides
     @Singleton
-    fun providePlayerRepository(dao: PlayerDao): PlayerRepository {
-        return PlayerRepositoryImpl(dao)
+    fun providePlayerRepository(firestore: FirebaseFirestore): PlayerRepository {
+        return PlayerRepositoryFirebaseImpl(firestore)
     }
 }
