@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rodrigo.androidapp.futtrack.core.AppConfig // IMPORT DO CADEADO
 import com.rodrigo.androidapp.futtrack.domain.model.Match
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.Team
@@ -100,28 +101,30 @@ fun MatchScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text("Agendar Novo Jogo", style = MaterialTheme.typography.titleMedium)
-
-                        TeamDropdown("Time Mandante", uiState.availableTeams, selectedHome, expandedHome, { expandedHome = it }) { selectedHome = it; expandedHome = false }
-                        TeamDropdown("Time Visitante", uiState.availableTeams, selectedAway, expandedAway, { expandedAway = it }) { selectedAway = it; expandedAway = false }
-
-                        Button(
-                            onClick = {
-                                if (selectedHome != null && selectedAway != null) {
-                                    onScheduleMatch(selectedHome!!, selectedAway!!)
-                                    selectedHome = null
-                                    selectedAway = null
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = selectedHome != null && selectedAway != null && selectedHome != selectedAway
+                if (AppConfig.IS_ADMIN) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text("Agendar")
+                            Text("Agendar Novo Jogo", style = MaterialTheme.typography.titleMedium)
+
+                            TeamDropdown("Time Mandante", uiState.availableTeams, selectedHome, expandedHome, { expandedHome = it }) { selectedHome = it; expandedHome = false }
+                            TeamDropdown("Time Visitante", uiState.availableTeams, selectedAway, expandedAway, { expandedAway = it }) { selectedAway = it; expandedAway = false }
+
+                            Button(
+                                onClick = {
+                                    if (selectedHome != null && selectedAway != null) {
+                                        onScheduleMatch(selectedHome!!, selectedAway!!)
+                                        selectedHome = null
+                                        selectedAway = null
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = selectedHome != null && selectedAway != null && selectedHome != selectedAway
+                            ) {
+                                Text("Agendar")
+                            }
                         }
                     }
                 }
@@ -153,7 +156,6 @@ fun MatchScreen(
         ScoreDialog(
             homeName = homeName,
             awayName = awayName,
-            // Passamos os gols atuais (se existirem) para pré-preencher o modal
             initialHomeScore = match.homeScore ?: 0,
             initialAwayScore = match.awayScore ?: 0,
             onDismiss = { matchToScore = null },
@@ -200,20 +202,20 @@ fun MatchItem(match: Match, homeName: String, awayName: String, onDelete: () -> 
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (match.status == MatchStatus.FINISHED) {
-                    // Ícone de Editar para jogos finalizados
-                    IconButton(onClick = onScoreClick) {
-                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Editar Placar")
+            if (AppConfig.IS_ADMIN) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (match.status == MatchStatus.FINISHED) {
+                        IconButton(onClick = onScoreClick) {
+                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Editar Placar")
+                        }
+                    } else {
+                        OutlinedButton(onClick = onScoreClick, modifier = Modifier.padding(end = 8.dp)) {
+                            Text("Placar")
+                        }
                     }
-                } else {
-                    // Botão de lançar placar para jogos em aberto
-                    OutlinedButton(onClick = onScoreClick, modifier = Modifier.padding(end = 8.dp)) {
-                        Text("Placar")
+                    IconButton(onClick = onDelete) {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Deletar Partida", tint = MaterialTheme.colorScheme.error)
                     }
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Deletar Partida", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -224,12 +226,11 @@ fun MatchItem(match: Match, homeName: String, awayName: String, onDelete: () -> 
 fun ScoreDialog(
     homeName: String,
     awayName: String,
-    initialHomeScore: Int, // Novo parâmetro
-    initialAwayScore: Int, // Novo parâmetro
+    initialHomeScore: Int,
+    initialAwayScore: Int,
     onDismiss: () -> Unit,
     onConfirm: (Int, Int) -> Unit
 ) {
-    // Inicia o state com os valores que vieram da partida
     var homeScore by remember { mutableIntStateOf(initialHomeScore) }
     var awayScore by remember { mutableIntStateOf(initialAwayScore) }
 
