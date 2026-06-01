@@ -1,7 +1,7 @@
 package com.rodrigo.androidapp.futtrack.di
 
-import com.rodrigo.androidapp.futtrack.data.local.dao.MatchDao
-import com.rodrigo.androidapp.futtrack.data.repository.MatchRepositoryImpl
+import com.google.firebase.firestore.FirebaseFirestore
+import com.rodrigo.androidapp.futtrack.data.repository.MatchRepositoryFirebaseImpl
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
 import dagger.Module
 import dagger.Provides
@@ -15,7 +15,7 @@ object MatchModule {
 
     @Provides
     @Singleton
-    fun provideMatchRepository(dao: MatchDao): MatchRepository {
-        return MatchRepositoryImpl(dao)
+    fun provideMatchRepository(firestore: FirebaseFirestore): MatchRepository {
+        return MatchRepositoryFirebaseImpl(firestore)
     }
 }

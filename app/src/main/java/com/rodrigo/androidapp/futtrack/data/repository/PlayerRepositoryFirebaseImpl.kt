@@ -36,7 +36,10 @@ class PlayerRepositoryFirebaseImpl @Inject constructor(
                     seedPlayersForTeam(teamId)
                 }
 
-                val sortedPlayers = players.sortedBy { it.number?.toIntOrNull() ?: 999 }
+                val sortedPlayers = players.sortedWith(
+                    compareBy<Player> { if (it.isGoalkeeper) 0 else 1 }
+                        .thenBy { it.number?.toIntOrNull() ?: 999 }
+                )
                 trySend(sortedPlayers)
             }
 
