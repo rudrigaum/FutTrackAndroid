@@ -60,6 +60,7 @@ import com.rodrigo.androidapp.futtrack.core.AppConfig
 import com.rodrigo.androidapp.futtrack.domain.model.Match
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.Team
+import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -67,16 +68,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.rodrigo.androidapp.futtrack.R
-
-@Composable
-fun getTeamCrest(teamId: String): Int {
-    return when (teamId) {
-        "team_brasil" -> R.drawable.ic_escudo_brasil
-        "team_italia" -> R.drawable.ic_escudo_italia
-        "team_alemanha" -> R.drawable.ic_escudo_alemanha
-        else -> R.drawable.ic_escudo_brasil
-    }
-}
 
 @Composable
 fun MatchRoute(
