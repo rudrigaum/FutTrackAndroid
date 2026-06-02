@@ -35,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,9 +44,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.core.AppConfig
@@ -58,6 +66,17 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.rodrigo.androidapp.futtrack.R
+
+@Composable
+fun getTeamCrest(teamId: String): Int {
+    return when (teamId) {
+        "team_brasil" -> R.drawable.ic_escudo_brasil
+        "team_italia" -> R.drawable.ic_escudo_italia
+        "team_alemanha" -> R.drawable.ic_escudo_alemanha
+        else -> R.drawable.ic_escudo_brasil
+    }
+}
 
 @Composable
 fun MatchRoute(
@@ -67,7 +86,6 @@ fun MatchRoute(
 
     MatchScreen(
         uiState = uiState,
-        // Agora recebemos a data escolhida no Date Picker
         onScheduleMatch = { home, away, date ->
             viewModel.scheduleNewMatch(home.id, away.id, date)
         },
@@ -119,7 +137,30 @@ fun MatchScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Partidas") }) }
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.logo_bal),
+                            contentDescription = "Logo BAL",
+                            modifier = Modifier.height(40.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Baba Amigos do Lelé",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        }
     ) { paddingValues ->
         if (uiState.isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -245,7 +286,12 @@ fun TeamDropdown(label: String, teams: List<Team>, selectedTeam: Team?, expanded
 
 @Composable
 fun MatchItem(match: Match, homeName: String, awayName: String, onDelete: () -> Unit, onScoreClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -253,22 +299,62 @@ fun MatchItem(match: Match, homeName: String, awayName: String, onDelete: () -> 
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+
             Column(modifier = Modifier.weight(1f)) {
-                if (match.status == MatchStatus.FINISHED) {
-                    Text(text = "$homeName ${match.homeScore} x ${match.awayScore} $awayName", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(text = "Finalizado", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                } else {
-                    Text(text = "$homeName vs $awayName", style = MaterialTheme.typography.bodyLarge)
-                    val formatter = DateTimeFormatter.ofPattern("HH:mm")
-                    Text(text = "Horário: ${match.date.format(formatter)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = getTeamCrest(match.homeTeamId)),
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = homeName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (match.status == MatchStatus.FINISHED) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (match.status == MatchStatus.FINISHED) {
+                        Text(
+                            text = match.homeScore.toString(),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = getTeamCrest(match.awayTeamId)),
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = awayName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (match.status == MatchStatus.FINISHED) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (match.status == MatchStatus.FINISHED) {
+                        Text(
+                            text = match.awayScore.toString(),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
             if (AppConfig.IS_ADMIN) {
+                Spacer(modifier = Modifier.width(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (match.status == MatchStatus.FINISHED) {
                         IconButton(onClick = onScoreClick) {
-                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Editar Placar")
+                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Editar Placar", tint = MaterialTheme.colorScheme.secondary)
                         }
                     } else {
                         OutlinedButton(onClick = onScoreClick, modifier = Modifier.padding(end = 8.dp)) {
