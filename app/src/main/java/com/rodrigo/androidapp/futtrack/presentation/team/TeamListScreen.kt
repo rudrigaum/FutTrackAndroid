@@ -41,6 +41,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.graphics.ColorFilter
+import com.rodrigo.androidapp.futtrack.ui.utils.getTeamJerseyColor
+import com.rodrigo.androidapp.futtrack.ui.utils.getTeamNumberColor
 import com.rodrigo.androidapp.futtrack.R
 import com.rodrigo.androidapp.futtrack.domain.model.Team
 import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
@@ -149,12 +152,41 @@ fun TeamListScreen(
                 } else {
                     LazyColumn {
                         items(uiState.selectedTeamPlayers) { player ->
+                            val jerseyColor = getTeamJerseyColor(selectedTeam!!.id, player.isGoalkeeper)
+                            val numberColor = getTeamNumberColor(selectedTeam!!.id, player.isGoalkeeper)
+
                             Column {
-                                Text(
-                                    text = "${player.number?.let { "#$it - " } ?: ""}${player.name} ${if (player.isGoalkeeper) "(GOL)" else ""}",
+                                Row(
                                     modifier = Modifier.padding(vertical = 8.dp),
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Image(
+                                            painter = painterResource(id = R.drawable.ic_camisa),
+                                            contentDescription = "Camisa do Jogador",
+                                            modifier = Modifier.fillMaxSize(),
+                                            colorFilter = ColorFilter.tint(jerseyColor)
+                                        )
+
+                                        Text(
+                                            text = player.number?.toString() ?: "?",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = numberColor
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(16.dp))
+
+                                    Text(
+                                        text = "${player.name} ${if (player.isGoalkeeper) "(GOL)" else ""}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                                 Divider(color = MaterialTheme.colorScheme.surfaceVariant)
                             }
                         }
