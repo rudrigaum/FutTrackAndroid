@@ -5,5 +5,6 @@ data class Player(
     val name: String,
     val teamId: String,
     val isGoalkeeper: Boolean,
-    val number: String? = null
+    val number: String? = null,
+    val goals: Int = 0
 )

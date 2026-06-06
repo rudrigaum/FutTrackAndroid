@@ -12,6 +12,11 @@ interface PlayerDao {
     @Query("SELECT * FROM players WHERE teamId = :teamId ORDER BY isGoalkeeper DESC, name ASC")
     fun getPlayersByTeam(teamId: String): Flow<List<PlayerEntity>>
 
+    @Query("SELECT * FROM players ORDER BY goals DESC, name ASC")
+    fun getTopScorers(): Flow<List<PlayerEntity>>
+    @Query("UPDATE players SET goals = :goals WHERE id = :playerId")
+    suspend fun updatePlayerGoals(playerId: String, goals: Int)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPlayer(player: PlayerEntity)
 

@@ -17,4 +17,14 @@ class PlayerRepositoryImpl @Inject constructor(
             entities.map { it.toDomain() }
         }
     }
+
+    override fun getTopScorers(): Flow<List<Player>> {
+        return dao.getTopScorers().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override suspend fun updatePlayerGoals(playerId: String, goals: Int) {
+        dao.updatePlayerGoals(playerId, goals)
+    }
 }
