@@ -22,8 +22,10 @@ data class PlayerEntity(
     @PrimaryKey val id: String,
     val name: String,
     val teamId: String,
-    val isGoalkeeper: Boolean
+    val isGoalkeeper: Boolean,
+    val number: String? = null,
+    val goals: Int = 0
 )
 
-fun PlayerEntity.toDomain() = Player(id, name, teamId, isGoalkeeper)
-fun Player.toEntity() = PlayerEntity(id, name, teamId, isGoalkeeper)
+fun PlayerEntity.toDomain() = Player(id, name, teamId, isGoalkeeper, number, goals)
+fun Player.toEntity() = PlayerEntity(id, name, teamId, isGoalkeeper, number, goals)

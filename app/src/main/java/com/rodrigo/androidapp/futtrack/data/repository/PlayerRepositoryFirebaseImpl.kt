@@ -1,11 +1,13 @@
 package com.rodrigo.androidapp.futtrack.data.repository
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.rodrigo.androidapp.futtrack.domain.model.Player
 import com.rodrigo.androidapp.futtrack.domain.repository.PlayerRepository
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 class PlayerRepositoryFirebaseImpl @Inject constructor(
@@ -28,7 +30,8 @@ class PlayerRepositoryFirebaseImpl @Inject constructor(
                         name = doc.getString("name") ?: "",
                         teamId = doc.getString("teamId") ?: "",
                         isGoalkeeper = doc.getBoolean("isGoalkeeper") ?: false,
-                        number = doc.getString("number") // Agora lê como String!
+                        number = doc.getString("number"),
+                        goals = doc.getLong("goals")?.toInt() ?: 0
                     )
                 } ?: emptyList()
 
@@ -44,6 +47,43 @@ class PlayerRepositoryFirebaseImpl @Inject constructor(
             }
 
         awaitClose { listener.remove() }
+    }
+
+    override fun getTopScorers(): Flow<List<Player>> = callbackFlow {
+        val listener = collection.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+
+            val players = snapshot?.documents?.mapNotNull { doc ->
+                Player(
+                    id = doc.id,
+                    name = doc.getString("name") ?: "",
+                    teamId = doc.getString("teamId") ?: "",
+                    isGoalkeeper = doc.getBoolean("isGoalkeeper") ?: false,
+                    number = doc.getString("number"),
+                    goals = doc.getLong("goals")?.toInt() ?: 0
+                )
+            } ?: emptyList()
+
+            val sortedPlayers = players.sortedWith(
+                compareByDescending<Player> { it.goals }
+                    .thenBy { it.name }
+            )
+
+            trySend(sortedPlayers)
+        }
+
+        awaitClose { listener.remove() }
+    }
+
+    override suspend fun updatePlayerGoals(playerId: String, goals: Int) {
+        try {
+            collection.document(playerId).update("goals", goals).await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun seedPlayersForTeam(teamId: String) {
@@ -63,7 +103,8 @@ class PlayerRepositoryFirebaseImpl @Inject constructor(
                 "name" to player.name,
                 "teamId" to player.teamId,
                 "isGoalkeeper" to player.isGoalkeeper,
-                "number" to player.number
+                "number" to player.number,
+                "goals" to player.goals
             )
             batch.set(docRef, data)
         }

@@ -24,6 +24,7 @@ import com.rodrigo.androidapp.futtrack.presentation.match.MatchRoute
 import com.rodrigo.androidapp.futtrack.presentation.standings.StandingsRoute
 import com.rodrigo.androidapp.futtrack.presentation.team.TeamListRoute
 import com.rodrigo.androidapp.futtrack.presentation.team.TeamPlayersRoute
+import com.rodrigo.androidapp.futtrack.presentation.topscorers.TopScorersRoute
 
 @Composable
 fun FuttrakMainScreen() {
@@ -100,7 +101,7 @@ fun FuttrakMainScreen() {
                 StandingsRoute()
             }
             composable(BottomNavItem.Statistics.route) {
-                PlaceholderScreen("Estatísticas")
+                TopScorersRoute()
             }
         }
     }
