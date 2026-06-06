@@ -1,12 +1,16 @@
 package com.rodrigo.androidapp.futtrack.presentation.standings
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -17,16 +21,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rodrigo.androidapp.futtrack.R
+import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
 
 @Composable
 fun StandingsRoute(
@@ -41,7 +50,28 @@ fun StandingsRoute(
 fun StandingsScreen(uiState: StandingsUiState) {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Tabela de Classificação") })
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.logo_bal),
+                            contentDescription = "Logo BAL",
+                            modifier = Modifier.height(40.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Baba Amigos do Lelé",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
         }
     ) { paddingValues ->
         if (uiState.isLoading) {
@@ -56,6 +86,7 @@ fun StandingsScreen(uiState: StandingsUiState) {
             ) {
                 StandingRow(
                     position = "#",
+                    teamId = null, // O Header não tem escudo
                     teamName = "Time",
                     points = "Pts",
                     played = "J",
@@ -66,15 +97,15 @@ fun StandingsScreen(uiState: StandingsUiState) {
                     isHeader = true
                 )
 
-                Divider() // Linha divisória fina
+                Divider(color = MaterialTheme.colorScheme.surfaceVariant)
 
-                // Lista de Times
                 LazyColumn {
                     itemsIndexed(uiState.standings) { index, standing ->
                         val position = index + 1
 
                         StandingRow(
                             position = position.toString(),
+                            teamId = standing.team.id,
                             teamName = standing.team.name,
                             points = standing.points.toString(),
                             played = standing.matchesPlayed.toString(),
@@ -95,6 +126,7 @@ fun StandingsScreen(uiState: StandingsUiState) {
 @Composable
 fun StandingRow(
     position: String,
+    teamId: String?,
     teamName: String,
     points: String,
     played: String,
@@ -111,19 +143,31 @@ fun StandingRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(if (isHeader) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface)
-            .padding(vertical = 12.dp, horizontal = 8.dp), // Reduzido o padding horizontal para dar mais espaço
+            .padding(vertical = 12.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = position, modifier = Modifier.width(20.dp), style = textStyle, fontWeight = fontWeight, textAlign = TextAlign.Center)
 
-        Text(
-            text = teamName,
+        Row(
             modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-            style = textStyle,
-            fontWeight = if (isHeader) fontWeight else FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (teamId != null) {
+                Image(
+                    painter = painterResource(id = getTeamCrest(teamId)),
+                    contentDescription = null,
+                    modifier = Modifier.size(26.dp).padding(end = 6.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
+            Text(
+                text = teamName,
+                style = textStyle,
+                fontWeight = if (isHeader) fontWeight else FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
         Text(text = points, modifier = Modifier.width(26.dp), style = textStyle, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Text(text = played, modifier = Modifier.width(22.dp), style = textStyle, fontWeight = fontWeight, textAlign = TextAlign.Center)

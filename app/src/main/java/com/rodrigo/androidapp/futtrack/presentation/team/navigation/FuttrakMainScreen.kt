@@ -1,5 +1,4 @@
 package com.rodrigo.androidapp.futtrack.presentation.navigation
-import com.rodrigo.androidapp.futtrack.presentation.match.MatchRoute
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,16 +14,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.rodrigo.androidapp.futtrack.presentation.team.TeamListRoute
+import androidx.navigation.navArgument
+import com.rodrigo.androidapp.futtrack.presentation.match.MatchRoute
 import com.rodrigo.androidapp.futtrack.presentation.standings.StandingsRoute
+import com.rodrigo.androidapp.futtrack.presentation.team.TeamListRoute
+import com.rodrigo.androidapp.futtrack.presentation.team.TeamPlayersRoute
 
 @Composable
 fun FuttrakMainScreen() {
-    // NavController is equivalent to managing the selected tab and navigation stack state
     val navController = rememberNavController()
 
     val items = listOf(
@@ -67,8 +69,30 @@ fun FuttrakMainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Teams.route) {
-                TeamListRoute()
+                TeamListRoute(
+                    onNavigateToTeamPlayers = { teamId, teamName ->
+                        navController.navigate("team_players/$teamId/$teamName")
+                    }
+                )
             }
+
+            composable(
+                route = "team_players/{teamId}/{teamName}",
+                arguments = listOf(
+                    navArgument("teamId") { type = NavType.StringType },
+                    navArgument("teamName") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val teamId = backStackEntry.arguments?.getString("teamId") ?: ""
+                val teamName = backStackEntry.arguments?.getString("teamName") ?: ""
+
+                TeamPlayersRoute(
+                    teamId = teamId,
+                    teamName = teamName,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
             composable(BottomNavItem.Matches.route) {
                 MatchRoute()
             }

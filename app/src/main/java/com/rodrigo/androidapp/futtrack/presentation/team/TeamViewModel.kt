@@ -18,13 +18,14 @@ import javax.inject.Inject
 data class TeamUiState(
     val teams: List<Team> = emptyList(),
     val isLoading: Boolean = true,
-    val selectedTeamPlayers: List<Player> = emptyList() // Adicionamos a lista de jogadores aqui
+    val isPlayersLoading: Boolean = false,
+    val selectedTeamPlayers: List<Player> = emptyList()
 )
 
 @HiltViewModel
 class TeamViewModel @Inject constructor(
     private val teamRepository: TeamRepository,
-    private val playerRepository: PlayerRepository // Injetamos o repositório de jogadores
+    private val playerRepository: PlayerRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TeamUiState())
@@ -46,14 +47,17 @@ class TeamViewModel @Inject constructor(
 
     fun loadPlayersForTeam(teamId: String) {
         playersJob?.cancel()
+
+        _uiState.update { it.copy(isPlayersLoading = true, selectedTeamPlayers = emptyList()) }
+
         playersJob = viewModelScope.launch {
             playerRepository.getPlayersByTeam(teamId).collect { players ->
-                _uiState.update { it.copy(selectedTeamPlayers = players) }
+                _uiState.update { it.copy(selectedTeamPlayers = players, isPlayersLoading = false) }
             }
         }
     }
 
     fun clearSelectedPlayers() {
-        _uiState.update { it.copy(selectedTeamPlayers = emptyList()) }
+        _uiState.update { it.copy(selectedTeamPlayers = emptyList(), isPlayersLoading = false) }
     }
 }
