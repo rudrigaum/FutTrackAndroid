@@ -1,0 +1,41 @@
+name: Deploy to Firebase App Distribution
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  distribute:
+    name: Build & Distribute
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Inject google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID }}
+          token: ${{ secrets.FIREBASE_TOKEN }}
+          groups: baba-amigos-do-lele
+
+          file: app/build/outputs/apk/debug/app-debug.apk
+          releaseNotes: "Nova versão do FutTrack disponível! Confira as últimas atualizações da artilharia."
