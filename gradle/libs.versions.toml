@@ -10,7 +10,7 @@ kotlin = "1.9.24"
 composeBom = "2024.06.00"
 hilt = "2.51.1"
 hiltNavigationCompose = "1.2.0"
-navEvent = "1.0.0"
+navEvent = "1.1.1"
 navigationCompose = "2.7.7" # Ou a versão mais estável que preferir
 
 [libraries]
