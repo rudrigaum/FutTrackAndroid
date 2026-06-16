@@ -1,0 +1,7 @@
+style:
+  MagicNumber:
+    active: false
+  NewLineAtEndOfFile:
+    active: false
+  WildcardImport:
+    active: false

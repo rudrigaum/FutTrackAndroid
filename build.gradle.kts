@@ -5,3 +5,8 @@ plugins {
     id("com.google.gms.google-services") version "4.4.1" apply false
     id("io.gitlab.arturbosch.detekt") version "1.23.6"
 }
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(files("$projectDir/config/detekt/detekt.yml"))
+}
