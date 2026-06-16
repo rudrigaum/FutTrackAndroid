@@ -1,5 +1,5 @@
 package com.rodrigo.androidapp.futtrack.core
 
 object AppConfig {
-    const val IS_ADMIN = true
+    const val IS_ADMIN = false
 }
