@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday" # Toda segunda-feira ele faz a checagem
+    open-pull-requests-limit: 5 # Limita a 5 PRs simultâneos para não poluir o repositório
+    labels:
+      - "dependencies"
+      - "android"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
