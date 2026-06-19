@@ -1,5 +1,8 @@
+package com.rodrigo.androidapp.futtrack.data.repository
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.GoogleAuthProvider
 import com.rodrigo.androidapp.futtrack.domain.model.UserProfile
 import com.rodrigo.androidapp.futtrack.domain.repository.AuthRepository
 import kotlinx.coroutines.channels.awaitClose
@@ -54,6 +57,20 @@ class AuthRepositoryFirebaseImpl @Inject constructor(
                 isAdmin = false
             )
             docRef.set(newUser).await()
+        }
+    }
+
+    override suspend fun signInWithGoogleToken(idToken: String): Result<Unit> {
+        return try {
+            val credential = GoogleAuthProvider.getCredential(idToken, null)
+
+            auth.signInWithCredential(credential).await()
+
+            syncUserAuth()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }

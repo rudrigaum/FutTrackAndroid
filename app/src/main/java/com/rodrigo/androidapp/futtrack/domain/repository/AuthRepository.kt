@@ -5,4 +5,5 @@ import kotlinx.coroutines.flow.Flow
 interface AuthRepository {
     fun getCurrentUserStream(): Flow<UserProfile?>
     suspend fun syncUserAuth()
+    suspend fun signInWithGoogleToken(idToken: String): Result<Unit>
 }

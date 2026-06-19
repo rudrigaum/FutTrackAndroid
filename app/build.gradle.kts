@@ -76,7 +76,7 @@ dependencies {
     // Firebase Auth
     implementation(libs.firebase.auth)
 
-    // Credential Manager (Substituto do antigo Google Sign-In)
+    // Credential Manager 
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
