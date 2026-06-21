@@ -36,19 +36,27 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.R
 import com.rodrigo.androidapp.futtrack.domain.model.Team
+import com.rodrigo.androidapp.futtrack.presentation.auth.AuthViewModel
+import com.rodrigo.androidapp.futtrack.presentation.auth.components.AdminLoginButton
 import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
 
 @Composable
 fun TeamListRoute(
     viewModel: TeamViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel(),
     onNavigateToTeamPlayers: (String, String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
 
     TeamListScreen(
         uiState = uiState,
+        isAdminMode = authUiState.isAdminMode,
         onTeamClick = { team ->
             onNavigateToTeamPlayers(team.id, team.name)
+        },
+        onAdminLoginTokenReceived = { token ->
+            authViewModel.signInWithGoogleToken(token)
         }
     )
 }
@@ -57,7 +65,9 @@ fun TeamListRoute(
 @Composable
 fun TeamListScreen(
     uiState: TeamUiState,
-    onTeamClick: (Team) -> Unit
+    isAdminMode: Boolean,
+    onTeamClick: (Team) -> Unit,
+    onAdminLoginTokenReceived: (String) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -104,6 +114,33 @@ fun TeamListScreen(
                             team = team,
                             onClick = { onTeamClick(team) }
                         )
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        if (isAdminMode) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "👑 Modo Capitão Ativado",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AdminLoginButton(
+                                    onTokenReceived = onAdminLoginTokenReceived
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
             }
