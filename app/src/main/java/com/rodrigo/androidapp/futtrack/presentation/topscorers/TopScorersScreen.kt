@@ -33,25 +33,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.R
 import com.rodrigo.androidapp.futtrack.domain.model.Player
+import com.rodrigo.androidapp.futtrack.presentation.auth.AuthViewModel
 import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
 
 @Composable
 fun TopScorersRoute(
-    viewModel: TopScorersViewModel = hiltViewModel()
+    viewModel: TopScorersViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
 
     TopScorersScreen(
         uiState = uiState,
+        isAdminMode = authUiState.isAdminMode,
         onIncrement = { player -> viewModel.updatePlayerGoals(player.id, player.goals, true) },
         onDecrement = { player -> viewModel.updatePlayerGoals(player.id, player.goals, false) }
     )
@@ -61,6 +65,7 @@ fun TopScorersRoute(
 @Composable
 fun TopScorersScreen(
     uiState: TopScorersUiState,
+    isAdminMode: Boolean,
     onIncrement: (Player) -> Unit,
     onDecrement: (Player) -> Unit
 ) {
@@ -113,7 +118,7 @@ fun TopScorersScreen(
                         TopScorerItem(
                             rank = index + 1,
                             player = player,
-                            isAdmin = uiState.isAdminMode,
+                            isAdmin = isAdminMode,
                             onIncrement = { onIncrement(player) },
                             onDecrement = { onDecrement(player) }
                         )
@@ -144,9 +149,9 @@ fun TopScorerItem(
     }
 
     val rankIcon = when (rank) {
-        1 -> " 🏆"
-        2 -> " 🥈"
-        3 -> " 🥉"
+        1 -> " \uD83C\uDFC6"
+        2 -> " \uD83E\uDD48"
+        3 -> " \uD83E\uDD49"
         else -> "º"
     }
 
@@ -193,7 +198,7 @@ fun TopScorerItem(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 8.dp, end = 24.dp)
             )
-            
+
             if (isAdmin) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
