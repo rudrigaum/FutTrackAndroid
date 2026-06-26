@@ -1,6 +1,10 @@
 package com.rodrigo.androidapp.futtrack.domain.model
 
+import com.google.firebase.firestore.PropertyName
+
 data class UserProfile(
-    val uid: String = "",
-    val isAdmin: Boolean = false
+    var uid: String = "",
+    @get:PropertyName("isAdmin")
+    @set:PropertyName("isAdmin")
+    var isAdmin: Boolean = false
 )

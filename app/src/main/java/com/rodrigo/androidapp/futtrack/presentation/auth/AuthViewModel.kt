@@ -2,6 +2,8 @@ package com.rodrigo.androidapp.futtrack.presentation.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.rodrigo.androidapp.futtrack.domain.model.UserProfile
 import com.rodrigo.androidapp.futtrack.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.util.Log
 
 data class AuthUiState(
     val userProfile: UserProfile? = null,
@@ -37,6 +40,7 @@ class AuthViewModel @Inject constructor(
     private fun observeAuthState() {
         viewModelScope.launch {
             authRepository.getCurrentUserStream().collect { profile ->
+                Log.d("AuthDebug", "VAR: Perfil recebido do Firestore -> $profile")
                 _uiState.update { currentState ->
                     currentState.copy(
                         userProfile = profile,
@@ -47,19 +51,28 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun signInWithGoogleToken(idToken: String) {
+    fun signInWithEmail(
+        email: String,
+        password: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                authRepository.signInWithEmail(email, password)
+                authRepository.syncUserAuth()
+                onSuccess()
 
-            val result = authRepository.signInWithGoogleToken(idToken)
+            } catch (e: Exception) {
+                e.printStackTrace()
 
-            result.onFailure { error ->
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = error.message ?: "Erro desconhecido ao logar"
-                    )
+                val errorMessage = when (e) {
+                    is FirebaseAuthInvalidUserException -> "E-mail não encontrado. Tem certeza que é o do admin?"
+                    is FirebaseAuthInvalidCredentialsException -> "Senha incorreta, meu chapa. Tenta de novo."
+                    else -> "Ocorreu um erro ao tentar logar. Verifique sua internet."
                 }
+
+                onError(errorMessage)
             }
         }
     }

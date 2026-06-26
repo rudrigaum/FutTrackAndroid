@@ -2,7 +2,8 @@ package com.rodrigo.androidapp.futtrack.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.tasks.await
 import com.rodrigo.androidapp.futtrack.domain.model.UserProfile
 import com.rodrigo.androidapp.futtrack.domain.repository.AuthRepository
 import kotlinx.coroutines.channels.awaitClose
@@ -13,36 +14,46 @@ import javax.inject.Inject
 
 class AuthRepositoryFirebaseImpl @Inject constructor(
     private val auth: FirebaseAuth,
+    private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore
 ) : AuthRepository {
 
     private val usersCollection = firestore.collection("users")
 
     override fun getCurrentUserStream(): Flow<UserProfile?> = callbackFlow {
-        val currentUser = auth.currentUser
+        var firestoreListener: ListenerRegistration? = null
 
-        if (currentUser == null) {
-            trySend(null)
-            close()
-            return@callbackFlow
+        val authStateListener = FirebaseAuth.AuthStateListener { currentAuth ->
+            val user = currentAuth.currentUser
+
+            firestoreListener?.remove()
+
+            if (user == null) {
+                trySend(null)
+            } else {
+                firestoreListener = usersCollection.document(user.uid)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            trySend(null)
+                            return@addSnapshotListener
+                        }
+
+                        if (snapshot != null && snapshot.exists()) {
+                            val userProfile = snapshot.toObject(UserProfile::class.java)
+                            trySend(userProfile)
+                        } else {
+                            trySend(null)
+                        }
+                    }
+            }
         }
 
-        val listener = usersCollection.document(currentUser.uid)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    trySend(null)
-                    return@addSnapshotListener
-                }
+        firebaseAuth.addAuthStateListener(authStateListener)
 
-                if (snapshot != null && snapshot.exists()) {
-                    val userProfile = snapshot.toObject(UserProfile::class.java)
-                    trySend(userProfile)
-                } else {
-                    trySend(null)
-                }
-            }
-
-        awaitClose { listener.remove() }
+        awaitClose {
+            firebaseAuth.removeAuthStateListener(authStateListener)
+            firestoreListener?.remove()
+        }
     }
 
     override suspend fun syncUserAuth() {
@@ -60,17 +71,7 @@ class AuthRepositoryFirebaseImpl @Inject constructor(
         }
     }
 
-    override suspend fun signInWithGoogleToken(idToken: String): Result<Unit> {
-        return try {
-            val credential = GoogleAuthProvider.getCredential(idToken, null)
-
-            auth.signInWithCredential(credential).await()
-
-            syncUserAuth()
-
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    override suspend fun signInWithEmail(email: String, password: String) {
+        firebaseAuth.signInWithEmailAndPassword(email, password).await()
     }
 }
