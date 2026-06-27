@@ -16,7 +16,7 @@ fun getTeamJerseyColor(teamId: String, isGoalkeeper: Boolean = false): Color {
     return when (teamId) {
         "team_brasil" -> if (isGoalkeeper) Color(0xFF009B3A) else Color(0xFFFDE100) // GOL: Verde | LINHA: Amarelo
         "team_italia" -> if (isGoalkeeper) Color(0xFFD32F2F) else Color(0xFF005DB4) // GOL: Vermelho | LINHA: Azul
-        "team_alemanha" -> if (isGoalkeeper) Color(0xFF000000) else Color(0xFFFFFFFF) // GOL: Preto | LINHA: Branco
+        "team_alemanha" -> if (isGoalkeeper) Color(0xFF000000) else Color(0xFFF0F0F0) // GOL: Preto | LINHA: Branco
         else -> Color(0xFFCCCCCC)
     }
 }
