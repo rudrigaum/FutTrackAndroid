@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalContext
 
 @Composable
@@ -74,6 +75,10 @@ fun TeamListRoute(
                     Toast.makeText(context, mensagemDeErro, Toast.LENGTH_LONG).show()
                 }
             )
+        },
+        onAdminLogout = {
+            authViewModel.signOut()
+            Toast.makeText(context, "Sessão de Capitão encerrada.", Toast.LENGTH_SHORT).show()
         }
     )
 }
@@ -84,7 +89,8 @@ fun TeamListScreen(
     uiState: TeamUiState,
     isAdminMode: Boolean,
     onTeamClick: (Team) -> Unit,
-    onAdminLoginConfirm: (String, String) -> Unit
+    onAdminLoginConfirm: (String, String) -> Unit,
+    onAdminLogout: () -> Unit = {}
 ) {
     var showLoginDialog by remember { mutableStateOf(false) }
 
@@ -138,8 +144,16 @@ fun TeamListScreen(
                     item {
                         Spacer(modifier = Modifier.height(24.dp))
                         if (isAdminMode) {
-                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text("👑 Modo Capitão Ativado", color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(16.dp))
+                                TextButton(onClick = onAdminLogout) {
+                                    Text("Sair", color = MaterialTheme.colorScheme.error)
+                                }
                             }
                         } else {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

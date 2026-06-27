@@ -6,4 +6,5 @@ interface AuthRepository {
     fun getCurrentUserStream(): Flow<UserProfile?>
     suspend fun syncUserAuth()
     suspend fun signInWithEmail(email: String, password: String)
+    suspend fun signOut()
 }

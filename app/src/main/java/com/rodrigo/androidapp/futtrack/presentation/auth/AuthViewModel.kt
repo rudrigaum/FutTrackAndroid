@@ -76,4 +76,14 @@ class AuthViewModel @Inject constructor(
             }
         }
     }
+
+    fun signOut() {
+        viewModelScope.launch {
+            try {
+                authRepository.signOut()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 }
