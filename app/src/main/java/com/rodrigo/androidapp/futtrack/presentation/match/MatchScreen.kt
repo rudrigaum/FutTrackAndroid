@@ -1,13 +1,18 @@
 package com.rodrigo.androidapp.futtrack.presentation.match
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -18,6 +23,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -44,22 +50,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.height
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rodrigo.androidapp.futtrack.core.AppConfig
+import com.rodrigo.androidapp.futtrack.R
 import com.rodrigo.androidapp.futtrack.domain.model.Match
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.Team
+import com.rodrigo.androidapp.futtrack.presentation.auth.AuthViewModel
 import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
 import java.time.Instant
 import java.time.LocalDate
@@ -67,16 +69,18 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import com.rodrigo.androidapp.futtrack.R
 
 @Composable
 fun MatchRoute(
-    viewModel: MatchViewModel = hiltViewModel()
+    viewModel: MatchViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
 
     MatchScreen(
         uiState = uiState,
+        isAdminMode = authUiState.isAdminMode,
         onScheduleMatch = { home, away, date ->
             viewModel.scheduleNewMatch(home.id, away.id, date)
         },
@@ -93,6 +97,7 @@ fun MatchRoute(
 @Composable
 fun MatchScreen(
     uiState: MatchUiState,
+    isAdminMode: Boolean,
     onScheduleMatch: (Team, Team, LocalDateTime) -> Unit,
     onDeleteMatch: (String) -> Unit,
     onFinishMatch: (String, Int, Int) -> Unit
@@ -165,7 +170,8 @@ fun MatchScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                if (AppConfig.IS_ADMIN) {
+                // <-- Substituímos o AppConfig pelo nosso Estado Reativo
+                if (isAdminMode) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier.padding(16.dp),
@@ -232,6 +238,7 @@ fun MatchScreen(
                                     match = match,
                                     homeName = homeName,
                                     awayName = awayName,
+                                    isAdminMode = isAdminMode,
                                     onDelete = { onDeleteMatch(match.id) },
                                     onScoreClick = { matchToScore = match }
                                 )
@@ -276,10 +283,17 @@ fun TeamDropdown(label: String, teams: List<Team>, selectedTeam: Team?, expanded
 }
 
 @Composable
-fun MatchItem(match: Match, homeName: String, awayName: String, onDelete: () -> Unit, onScoreClick: () -> Unit) {
+fun MatchItem(
+    match: Match,
+    homeName: String,
+    awayName: String,
+    isAdminMode: Boolean,
+    onDelete: () -> Unit,
+    onScoreClick: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = androidx.compose.material3.CardDefaults.cardColors(
+        colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
@@ -340,7 +354,7 @@ fun MatchItem(match: Match, homeName: String, awayName: String, onDelete: () -> 
                 }
             }
 
-            if (AppConfig.IS_ADMIN) {
+            if (isAdminMode) {
                 Spacer(modifier = Modifier.width(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (match.status == MatchStatus.FINISHED) {

@@ -1,5 +1,6 @@
 package com.rodrigo.androidapp.futtrack.presentation.team
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,19 +37,48 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.R
 import com.rodrigo.androidapp.futtrack.domain.model.Team
+import com.rodrigo.androidapp.futtrack.presentation.auth.AuthViewModel
 import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
+import com.rodrigo.androidapp.futtrack.presentation.auth.components.AdminLoginDialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun TeamListRoute(
     viewModel: TeamViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel(),
     onNavigateToTeamPlayers: (String, String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     TeamListScreen(
         uiState = uiState,
+        isAdminMode = authUiState.isAdminMode,
         onTeamClick = { team ->
             onNavigateToTeamPlayers(team.id, team.name)
+        },
+        onAdminLoginConfirm = { email, password ->
+            authViewModel.signInWithEmail(
+                email = email,
+                password = password,
+                onSuccess = {
+                    Toast.makeText(context, "👑 Modo Capitão ativado com sucesso!", Toast.LENGTH_SHORT).show()
+                },
+                onError = { mensagemDeErro ->
+                    Toast.makeText(context, mensagemDeErro, Toast.LENGTH_LONG).show()
+                }
+            )
+        },
+        onAdminLogout = {
+            authViewModel.signOut()
+            Toast.makeText(context, "Sessão de Capitão encerrada.", Toast.LENGTH_SHORT).show()
         }
     )
 }
@@ -57,8 +87,13 @@ fun TeamListRoute(
 @Composable
 fun TeamListScreen(
     uiState: TeamUiState,
-    onTeamClick: (Team) -> Unit
+    isAdminMode: Boolean,
+    onTeamClick: (Team) -> Unit,
+    onAdminLoginConfirm: (String, String) -> Unit,
+    onAdminLogout: () -> Unit = {}
 ) {
+    var showLoginDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -105,6 +140,39 @@ fun TeamListScreen(
                             onClick = { onTeamClick(team) }
                         )
                     }
+
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        if (isAdminMode) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("👑 Modo Capitão Ativado", color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(16.dp))
+                                TextButton(onClick = onAdminLogout) {
+                                    Text("Sair", color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        } else {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Button(onClick = { showLoginDialog = true }) {
+                                    Text("Área do Administrador")
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+                  }
+                if (showLoginDialog) {
+                    AdminLoginDialog(
+                        onDismiss = { showLoginDialog = false },
+                        onLoginConfirm = { email, password ->
+                            showLoginDialog = false
+                            onAdminLoginConfirm(email, password)
+                        }
+                    )
                 }
             }
         }

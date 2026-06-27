@@ -11,7 +11,10 @@ composeBom = "2024.06.00"
 hilt = "2.51.1"
 hiltNavigationCompose = "1.2.0"
 navEvent = "1.0.0"
-navigationCompose = "2.7.7" # Ou a versão mais estável que preferir
+navigationCompose = "2.7.7"
+firebaseAuth = "22.3.1"
+credentials = "1.2.2"
+googleId = "1.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -35,6 +38,10 @@ androidx-navigationevent = { group = "androidx.navigationevent", name = "navigat
 androidx-navigationevent-compose = { group = "androidx.navigationevent", name = "navigationevent-compose", version.ref = "navEvent" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth", version.ref = "firebaseAuth" }
+androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
+androidx-credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
+googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleId" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
