@@ -2,7 +2,6 @@ package com.rodrigo.androidapp.futtrack.presentation.topscorers
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.rodrigo.androidapp.futtrack.core.AppConfig
 import com.rodrigo.androidapp.futtrack.domain.model.Player
 import com.rodrigo.androidapp.futtrack.domain.repository.PlayerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,8 +14,7 @@ import javax.inject.Inject
 
 data class TopScorersUiState(
     val topScorers: List<Player> = emptyList(),
-    val isLoading: Boolean = true,
-    val isAdminMode: Boolean = AppConfig.IS_ADMIN
+    val isLoading: Boolean = true
 )
 
 @HiltViewModel
@@ -40,8 +38,6 @@ class TopScorersViewModel @Inject constructor(
     }
 
     fun updatePlayerGoals(playerId: String, currentGoals: Int, isIncrement: Boolean) {
-        if (!_uiState.value.isAdminMode) return
-
         val newGoals = if (isIncrement) currentGoals + 1 else currentGoals - 1
         if (newGoals < 0) return
 
