@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,6 +9,14 @@ plugins {
     id("com.google.gms.google-services")
     id("io.gitlab.arturbosch.detekt")
 }
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(FileInputStream(localPropertiesFile))
+    }
+}
+val youtubeKey = localProperties.getProperty("YOUTUBE_API_KEY") ?: "\"\""
 
 android {
     namespace = "com.rodrigo.androidapp.futtrack"
@@ -19,6 +30,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "YOUTUBE_API_KEY", youtubeKey)
     }
 
     buildTypes {
@@ -42,6 +54,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -62,6 +75,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(platform("com.google.firebase:firebase-bom:33.0.0"))
     implementation("com.google.firebase:firebase-firestore")
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
 
     implementation("com.google.dagger:hilt-android:2.51.1")
     kapt("com.google.dagger:hilt-compiler:2.51.1")
