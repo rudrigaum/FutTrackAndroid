@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -25,6 +26,8 @@ import com.rodrigo.androidapp.futtrack.presentation.standings.StandingsRoute
 import com.rodrigo.androidapp.futtrack.presentation.team.TeamListRoute
 import com.rodrigo.androidapp.futtrack.presentation.team.TeamPlayersRoute
 import com.rodrigo.androidapp.futtrack.presentation.topscorers.TopScorersRoute
+import com.rodrigo.androidapp.futtrack.presentation.video.navigation.VideoRoute
+import com.rodrigo.androidapp.futtrack.presentation.video.navigation.videoScreen
 
 @Composable
 fun FuttrakMainScreen() {
@@ -34,7 +37,8 @@ fun FuttrakMainScreen() {
         BottomNavItem.Teams,
         BottomNavItem.Matches,
         BottomNavItem.Standings,
-        BottomNavItem.Statistics
+        BottomNavItem.Statistics,
+        BottomNavItem.Videos
     )
 
     Scaffold(
@@ -44,19 +48,29 @@ fun FuttrakMainScreen() {
                 val currentDestination = navBackStackEntry?.destination
 
                 items.forEach { item ->
-                    val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                    val selected = if (item is BottomNavItem.Videos) {
+                        currentDestination?.hasRoute<VideoRoute>() == true
+                    } else {
+                        currentDestination?.hierarchy?.any { it.route == item.route } == true
+                    }
 
                     NavigationBarItem(
                         icon = { Icon(imageVector = item.icon, contentDescription = item.title) },
                         label = { Text(text = item.title) },
                         selected = selected,
                         onClick = {
-                            navController.navigate(item.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+                            if (item is BottomNavItem.Videos) {
+                                navController.navigate(VideoRoute) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
+                            } else {
+                                navController.navigate(item.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         }
                     )
@@ -103,16 +117,12 @@ fun FuttrakMainScreen() {
             composable(BottomNavItem.Statistics.route) {
                 TopScorersRoute()
             }
-        }
-    }
-}
 
-@Composable
-fun PlaceholderScreen(title: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = "Tela em construção: $title")
+            videoScreen(
+                onVideoClick = { video ->
+                    println("Clicou no vídeo do YouTube: ${video.title}")
+                }
+            )
+        }
     }
 }
