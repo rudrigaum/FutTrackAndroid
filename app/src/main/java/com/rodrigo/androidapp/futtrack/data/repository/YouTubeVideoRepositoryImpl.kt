@@ -1,5 +1,6 @@
 package com.rodrigo.androidapp.futtrack.data.repository
 
+import android.util.Log
 import com.rodrigo.androidapp.futtrack.BuildConfig
 import com.rodrigo.androidapp.futtrack.data.remote.YouTubeApiService
 import com.rodrigo.androidapp.futtrack.domain.model.Video
@@ -22,18 +23,28 @@ class YouTubeVideoRepositoryImpl @Inject constructor(
         try {
             supervisorScope {
                 val deferredVideos = channelIds.map { channelId ->
+                    val uploadsPlaylistId = if (channelId.startsWith("UC")) {
+                        channelId.replaceFirst("UC", "UU")
+                    } else {
+                        channelId
+                    }
+
                     async {
-                        apiService.fetchLatestVideos(apiKey = apiKey, channelId = channelId)
+                        apiService.fetchLatestVideos(
+                            apiKey = apiKey,
+                            playlistId = uploadsPlaylistId,
+                            part = "snippet",
+                            maxResults = 15
+                        )
                     }
                 }
 
                 val responses = deferredVideos.awaitAll()
 
                 val allVideos = responses.flatMap { response ->
-                    response.items.mapNotNull { item ->
-                        val videoId = item.id.videoId ?: return@mapNotNull null
+                    response.items.map { item ->
                         Video(
-                            id = videoId,
+                            id = item.snippet.resourceId.videoId,
                             title = item.snippet.title,
                             description = item.snippet.description,
                             thumbnailUrl = item.snippet.thumbnails.high.url,
@@ -45,6 +56,7 @@ class YouTubeVideoRepositoryImpl @Inject constructor(
                 Result.success(allVideos)
             }
         } catch (e: Exception) {
+            Log.e("FUTTRACK_NET", "Falha ao buscar feed de uploads do YouTube", e)
             Result.failure(e)
         }
     }
