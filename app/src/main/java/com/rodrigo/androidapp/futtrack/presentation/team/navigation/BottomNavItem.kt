@@ -4,10 +4,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow // 🎯 IMPORTANTE
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.graphics.vector.ImageVector
+
 sealed class BottomNavItem(
-    val route: String, // Usaremos String provisoriamente para o roteamento até configurarmos o Serialization
+    val route: String,
     val title: String,
     val icon: ImageVector
 ) {
@@ -33,5 +35,11 @@ sealed class BottomNavItem(
         route = "statistics_route",
         title = "Estatísticas",
         icon = Icons.Default.Star
+    )
+
+    data object Videos : BottomNavItem(
+        route = "videos_route",
+        title = "Vídeos",
+        icon = Icons.Default.PlayArrow
     )
 }

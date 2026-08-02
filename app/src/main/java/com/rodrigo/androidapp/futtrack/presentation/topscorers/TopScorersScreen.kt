@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,28 +20,24 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rodrigo.androidapp.futtrack.R
 import com.rodrigo.androidapp.futtrack.domain.model.Player
 import com.rodrigo.androidapp.futtrack.presentation.auth.AuthViewModel
+import com.rodrigo.androidapp.futtrack.presentation.components.FutTrackTopAppBar
 import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
 
 @Composable
@@ -56,75 +51,110 @@ fun TopScorersRoute(
     TopScorersScreen(
         uiState = uiState,
         isAdminMode = authUiState.isAdminMode,
-        onIncrement = { player -> viewModel.updatePlayerGoals(player.id, player.goals, true) },
-        onDecrement = { player -> viewModel.updatePlayerGoals(player.id, player.goals, false) }
+        onIncrement = { player ->
+            viewModel.updatePlayerGoals(
+                playerId = player.id,
+                currentGoals = player.goals,
+                isIncrement = true
+            )
+        },
+        onDecrement = { player ->
+            viewModel.updatePlayerGoals(
+                playerId = player.id,
+                currentGoals = player.goals,
+                isIncrement = false
+            )
+        }
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopScorersScreen(
     uiState: TopScorersUiState,
     isAdminMode: Boolean,
     onIncrement: (Player) -> Unit,
-    onDecrement: (Player) -> Unit
+    onDecrement: (Player) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Scaffold(
+        modifier = modifier,
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Image(
-                            painter = painterResource(id = R.drawable.logo_bal),
-                            contentDescription = "Logo BAL",
-                            modifier = Modifier.height(40.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Artilharia",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
+            FutTrackTopAppBar(title = "Artilharia")
         }
     ) { paddingValues ->
-        Box(
+        TopScorersContent(
+            uiState = uiState,
+            isAdminMode = isAdminMode,
+            onIncrement = onIncrement,
+            onDecrement = onDecrement,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            contentAlignment = Alignment.Center
-        ) {
-            if (uiState.isLoading) {
+                .padding(paddingValues)
+        )
+    }
+}
+
+@Composable
+private fun TopScorersContent(
+    uiState: TopScorersUiState,
+    isAdminMode: Boolean,
+    onIncrement: (Player) -> Unit,
+    onDecrement: (Player) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        when {
+            uiState.isLoading -> {
                 CircularProgressIndicator()
-            } else if (uiState.topScorers.isEmpty()) {
+            }
+
+            uiState.topScorers.isEmpty() -> {
                 Text(
                     text = "Nenhum jogador cadastrado.",
                     style = MaterialTheme.typography.bodyLarge
                 )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    itemsIndexed(uiState.topScorers) { index, player ->
-                        TopScorerItem(
-                            rank = index + 1,
-                            player = player,
-                            isAdmin = isAdminMode,
-                            onIncrement = { onIncrement(player) },
-                            onDecrement = { onDecrement(player) }
-                        )
-                    }
-                }
             }
+
+            else -> {
+                TopScorersList(
+                    players = uiState.topScorers,
+                    isAdminMode = isAdminMode,
+                    onIncrement = onIncrement,
+                    onDecrement = onDecrement,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopScorersList(
+    players: List<Player>,
+    isAdminMode: Boolean,
+    onIncrement: (Player) -> Unit,
+    onDecrement: (Player) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        itemsIndexed(
+            items = players,
+            key = { _, player -> player.id }
+        ) { index, player ->
+            TopScorerItem(
+                rank = index + 1,
+                player = player,
+                isAdmin = isAdminMode,
+                onIncrement = { onIncrement(player) },
+                onDecrement = { onDecrement(player) }
+            )
         }
     }
 }
@@ -135,28 +165,14 @@ fun TopScorerItem(
     player: Player,
     isAdmin: Boolean,
     onIncrement: () -> Unit,
-    onDecrement: () -> Unit
+    onDecrement: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val goldColor = Color(0xFFD4AF37)
-    val silverColor = Color(0xFFB0B0B0)
-    val bronzeColor = Color(0xFFCD7F32)
-
-    val rankColor = when (rank) {
-        1 -> goldColor
-        2 -> silverColor
-        3 -> bronzeColor
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    val rankIcon = when (rank) {
-        1 -> " \uD83C\uDFC6"
-        2 -> " \uD83E\uDD48"
-        3 -> " \uD83E\uDD49"
-        else -> "º"
-    }
+    val rankColor = getRankColor(rank)
+    val rankIndicator = getRankIndicator(rank)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -169,7 +185,7 @@ fun TopScorerItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "$rank$rankIcon",
+                text = "$rank$rankIndicator",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.width(48.dp),
@@ -192,51 +208,95 @@ fun TopScorerItem(
             )
 
             Text(
-                text = "${player.goals}",
+                text = player.goals.toString(),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 8.dp, end = 24.dp)
+                modifier = Modifier.padding(
+                    start = 8.dp,
+                    end = 24.dp
+                )
             )
 
             if (isAdmin) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onDecrement,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                    ) {
-                        Text(
-                            text = "-",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    IconButton(
-                        onClick = onIncrement,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Adicionar gol",
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
+                GoalControls(
+                    onIncrement = onIncrement,
+                    onDecrement = onDecrement
+                )
             } else {
                 Text(
                     text = "Gols",
                     style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(start = 4.dp, end = 8.dp)
+                    modifier = Modifier.padding(
+                        start = 4.dp,
+                        end = 8.dp
+                    )
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun GoalControls(
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onDecrement,
+            modifier = Modifier
+                .size(32.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = CircleShape
+                )
+        ) {
+            Text(
+                text = "-",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        IconButton(
+            onClick = onIncrement,
+            modifier = Modifier
+                .size(32.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = CircleShape
+                )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Adicionar gol",
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun getRankColor(rank: Int): Color {
+    return when (rank) {
+        1 -> Color(0xFFD4AF37)
+        2 -> Color(0xFFB0B0B0)
+        3 -> Color(0xFFCD7F32)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+private fun getRankIndicator(rank: Int): String {
+    return when (rank) {
+        1 -> " 🏆"
+        2 -> " 🥈"
+        3 -> " 🥉"
+        else -> "º"
     }
 }
