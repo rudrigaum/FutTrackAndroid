@@ -5,24 +5,28 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.domain.model.Video
+import com.rodrigo.androidapp.futtrack.presentation.components.FutTrackTopAppBar
 import com.rodrigo.androidapp.futtrack.presentation.video.components.VideoCard
 import com.rodrigo.androidapp.futtrack.ui.theme.FutTrackTheme
 
@@ -42,7 +46,6 @@ fun VideoScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoScreenContent(
     uiState: VideoUiState,
@@ -50,19 +53,23 @@ fun VideoScreenContent(
     onRetryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var activeVideoId by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
+
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(text = "Vídeos do Baba")
-                }
-            )
+            FutTrackTopAppBar(title = "Vídeos do Baba")
         }
     ) { paddingValues ->
         VideoScreenState(
             uiState = uiState,
-            onVideoClick = onVideoClick,
+            activeVideoId = activeVideoId,
+            onPlayClick = { video ->
+                activeVideoId = video.id
+            },
+            onOpenExternallyClick = onVideoClick,
             onRetryClick = onRetryClick,
             modifier = Modifier
                 .fillMaxSize()
@@ -74,7 +81,9 @@ fun VideoScreenContent(
 @Composable
 private fun VideoScreenState(
     uiState: VideoUiState,
-    onVideoClick: (Video) -> Unit,
+    activeVideoId: String?,
+    onPlayClick: (Video) -> Unit,
+    onOpenExternallyClick: (Video) -> Unit,
     onRetryClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -86,7 +95,9 @@ private fun VideoScreenState(
         is VideoUiState.Success -> {
             VideoListContent(
                 videos = uiState.videos,
-                onVideoClick = onVideoClick,
+                activeVideoId = activeVideoId,
+                onPlayClick = onPlayClick,
+                onOpenExternallyClick = onOpenExternallyClick,
                 modifier = modifier
             )
         }
@@ -116,7 +127,9 @@ private fun VideoLoadingContent(
 @Composable
 private fun VideoListContent(
     videos: List<Video>,
-    onVideoClick: (Video) -> Unit,
+    activeVideoId: String?,
+    onPlayClick: (Video) -> Unit,
+    onOpenExternallyClick: (Video) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -128,10 +141,53 @@ private fun VideoListContent(
             items = videos,
             key = Video::id
         ) { video ->
+            val isPlaying = video.id == activeVideoId
+
             VideoCard(
                 video = video,
-                onVideoClick = onVideoClick
+                isPlaying = isPlaying,
+                onPlayClick = onPlayClick,
+                playerContent = {
+                    VideoPlayerPlaceholder(
+                        video = video,
+                        onOpenExternallyClick = onOpenExternallyClick
+                    )
+                }
             )
+        }
+    }
+}
+
+@Composable
+private fun VideoPlayerPlaceholder(
+    video: Video,
+    onOpenExternallyClick: (Video) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(200.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CircularProgressIndicator()
+
+            Text(
+                text = "Preparando player...",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Button(
+                onClick = {
+                    onOpenExternallyClick(video)
+                }
+            ) {
+                Text(text = "Abrir no YouTube")
+            }
         }
     }
 }
