@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rodrigo.androidapp.futtrack.domain.model.TeamStanding
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
+import com.rodrigo.androidapp.futtrack.domain.repository.StandingBaselineRepository
 import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
 import com.rodrigo.androidapp.futtrack.domain.usecase.CalculateStandingsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import java.time.LocalDateTime
 import javax.inject.Inject
 
 data class StandingsUiState(
@@ -22,15 +24,25 @@ data class StandingsUiState(
 class StandingsViewModel @Inject constructor(
     private val teamRepository: TeamRepository,
     private val matchRepository: MatchRepository,
+    private val standingBaselineRepository: StandingBaselineRepository,
     private val calculateStandingsUseCase: CalculateStandingsUseCase
 ) : ViewModel() {
 
-
     val uiState: StateFlow<StandingsUiState> = combine(
         teamRepository.getTeams(),
-        matchRepository.getMatches()
-    ) { teams, matches ->
-        val calculatedStandings = calculateStandingsUseCase(teams, matches)
+        matchRepository.getMatches(),
+        standingBaselineRepository.getBaselines()
+    ) { teams, matches, baselines ->
+
+        val realMatches = matches.filter { match ->
+            !match.date.isBefore(REAL_MATCHES_START_DATE)
+        }
+
+        val calculatedStandings = calculateStandingsUseCase(
+            teams = teams,
+            matches = realMatches,
+            baselines = baselines
+        )
 
         StandingsUiState(
             isLoading = false,
@@ -38,7 +50,12 @@ class StandingsViewModel @Inject constructor(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = StandingsUiState(isLoading = true)
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = StandingsUiState()
     )
+
+    private companion object {
+        val REAL_MATCHES_START_DATE: LocalDateTime =
+            LocalDateTime.of(2026, 8, 8, 0, 0)
+    }
 }

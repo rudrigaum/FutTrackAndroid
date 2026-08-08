@@ -40,7 +40,6 @@ class AuthViewModel @Inject constructor(
     private fun observeAuthState() {
         viewModelScope.launch {
             authRepository.getCurrentUserStream().collect { profile ->
-                Log.d("AuthDebug", "VAR: Perfil recebido do Firestore -> $profile")
                 _uiState.update { currentState ->
                     currentState.copy(
                         userProfile = profile,
