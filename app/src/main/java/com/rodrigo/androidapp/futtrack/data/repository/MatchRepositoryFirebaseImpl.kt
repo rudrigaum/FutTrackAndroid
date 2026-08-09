@@ -1,7 +1,9 @@
 package com.rodrigo.androidapp.futtrack.data.repository
 
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.rodrigo.androidapp.futtrack.domain.model.Match
+import com.rodrigo.androidapp.futtrack.domain.model.MatchSlot
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
 import kotlinx.coroutines.channels.awaitClose
@@ -9,117 +11,160 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDateTime
-import java.util.UUID
 import javax.inject.Inject
 
 class MatchRepositoryFirebaseImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : MatchRepository {
 
-    private val collection = firestore.collection("matches")
+    private val matchesCollection =
+        firestore.collection(MATCHES_COLLECTION)
 
     override fun getMatches(): Flow<List<Match>> = callbackFlow {
-        val listener = collection.addSnapshotListener { snapshot, error ->
+        val listener = matchesCollection.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 close(error)
                 return@addSnapshotListener
             }
 
-            val matches = snapshot?.documents?.mapNotNull { doc ->
-                try {
-                    Match(
-                        id = doc.id,
-                        homeTeamId = doc.getString("homeTeamId") ?: "",
-                        awayTeamId = doc.getString("awayTeamId") ?: "",
-                        homeScore = doc.getLong("homeScore")?.toInt(),
-                        awayScore = doc.getLong("awayScore")?.toInt(),
-                        status = MatchStatus.valueOf(doc.getString("status") ?: MatchStatus.SCHEDULED.name),
-                        date = LocalDateTime.parse(doc.getString("date"))
-                    )
-                } catch (e: Exception) {
-                    null
+            val matches = snapshot
+                ?.documents
+                ?.mapNotNull { document ->
+                    document.toMatch()
                 }
-            } ?: emptyList()
+                .orEmpty()
+                .sortedWith(matchComparator)
 
-            if (matches.isEmpty() && snapshot?.metadata?.hasPendingWrites() == false) {
-                seedHistoricalMatches()
-            }
-
-            trySend(matches.sortedByDescending { it.date })
+            trySend(matches)
         }
 
-        awaitClose { listener.remove() }
+        awaitClose {
+            listener.remove()
+        }
     }
 
     override suspend fun scheduleMatch(match: Match) {
-        val data = hashMapOf(
-            "homeTeamId" to match.homeTeamId,
-            "awayTeamId" to match.awayTeamId,
-            "homeScore" to match.homeScore,
-            "awayScore" to match.awayScore,
-            "status" to match.status.name,
-            "date" to match.date.toString()
-        )
-        collection.document(match.id).set(data).await()
+        val matchNumber = requireNotNull(match.matchNumber) {
+            "Match number is required."
+        }
+
+        val slot = requireNotNull(
+            MatchSlot.fromMatchNumber(matchNumber)
+        ) {
+            "Invalid match number: $matchNumber"
+        }
+
+        require(match.date.toLocalTime() == slot.startTime) {
+            "Match time must match the selected slot."
+        }
+
+        val documentId = createMatchDocumentId(match)
+
+        val matchDocument = matchesCollection.document(documentId)
+
+        firestore.runTransaction { transaction ->
+            val existingMatch = transaction.get(matchDocument)
+
+            check(!existingMatch.exists()) {
+                "Match slot $matchNumber is already occupied for ${
+                    match.date.toLocalDate()
+                }."
+            }
+
+            transaction.set(
+                matchDocument,
+                match.toFirestoreData()
+            )
+        }.await()
     }
 
     override suspend fun updateMatch(match: Match) {
-        scheduleMatch(match)
+        matchesCollection
+            .document(match.id)
+            .update(
+                mapOf(
+                    FIELD_HOME_SCORE to match.homeScore,
+                    FIELD_AWAY_SCORE to match.awayScore,
+                    FIELD_STATUS to match.status.name
+                )
+            )
+            .await()
     }
 
     override suspend fun deleteMatch(matchId: String) {
-        collection.document(matchId).delete().await()
+        matchesCollection
+            .document(matchId)
+            .delete()
+            .await()
     }
 
-    private fun seedHistoricalMatches() {
-        val brasilId = "team_brasil"
-        val italiaId = "team_italia"
-        val alemanhaId = "team_alemanha"
+    private fun DocumentSnapshot.toMatch(): Match? {
+        return runCatching {
+            val homeTeamId = getString(FIELD_HOME_TEAM_ID)
+                ?: return null
 
-        val historicalDate = LocalDateTime.now().minusDays(1)
-        val generatedMatches = mutableListOf<Match>()
+            val awayTeamId = getString(FIELD_AWAY_TEAM_ID)
+                ?: return null
 
-        repeat(8) { generatedMatches.add(createDummyMatch(brasilId, italiaId, 1, 0, historicalDate)) }
-        repeat(6) { generatedMatches.add(createDummyMatch(brasilId, italiaId, 0, 1, historicalDate)) }
-        repeat(6) { generatedMatches.add(createDummyMatch(brasilId, italiaId, 1, 1, historicalDate)) }
+            val date = getString(FIELD_DATE)
+                ?.let(LocalDateTime::parse)
+                ?: return null
 
-        repeat(9) { generatedMatches.add(createDummyMatch(brasilId, alemanhaId, 1, 0, historicalDate)) }
-        generatedMatches.add(createDummyMatch(brasilId, alemanhaId, 14, 0, historicalDate)) // Ajuste de GP do Brasil
-        repeat(7) { generatedMatches.add(createDummyMatch(brasilId, alemanhaId, 0, 1, historicalDate)) }
-        generatedMatches.add(createDummyMatch(brasilId, alemanhaId, 0, 10, historicalDate)) // Ajuste de GP da Alemanha
-        repeat(2) { generatedMatches.add(createDummyMatch(brasilId, alemanhaId, 1, 1, historicalDate)) }
+            val status = getString(FIELD_STATUS)
+                ?.let(MatchStatus::valueOf)
+                ?: MatchStatus.SCHEDULED
 
-        repeat(10) { generatedMatches.add(createDummyMatch(italiaId, alemanhaId, 1, 0, historicalDate)) }
-        generatedMatches.add(createDummyMatch(italiaId, alemanhaId, 7, 0, historicalDate)) // Ajuste de GP da Itália
-        repeat(6) { generatedMatches.add(createDummyMatch(italiaId, alemanhaId, 0, 1, historicalDate)) }
-        generatedMatches.add(createDummyMatch(italiaId, alemanhaId, 0, 3, historicalDate)) // Ajuste de GP da Alemanha
-        repeat(2) { generatedMatches.add(createDummyMatch(italiaId, alemanhaId, 1, 1, historicalDate)) }
-
-        val batch = firestore.batch()
-        generatedMatches.forEach { match ->
-            val docRef = collection.document(match.id)
-            val data = hashMapOf(
-                "homeTeamId" to match.homeTeamId,
-                "awayTeamId" to match.awayTeamId,
-                "homeScore" to match.homeScore,
-                "awayScore" to match.awayScore,
-                "status" to match.status.name,
-                "date" to match.date.toString()
+            Match(
+                id = id,
+                matchNumber = getLong(FIELD_MATCH_NUMBER)?.toInt(),
+                homeTeamId = homeTeamId,
+                awayTeamId = awayTeamId,
+                homeScore = getLong(FIELD_HOME_SCORE)?.toInt(),
+                awayScore = getLong(FIELD_AWAY_SCORE)?.toInt(),
+                date = date,
+                status = status
             )
-            batch.set(docRef, data)
-        }
-        batch.commit()
+        }.getOrNull()
     }
 
-    private fun createDummyMatch(home: String, away: String, hScore: Int, aScore: Int, date: LocalDateTime): Match {
-        return Match(
-            id = UUID.randomUUID().toString(),
-            homeTeamId = home,
-            awayTeamId = away,
-            homeScore = hScore,
-            awayScore = aScore,
-            status = MatchStatus.FINISHED,
-            date = date
+    private fun Match.toFirestoreData(): Map<String, Any?> {
+        return mapOf(
+            FIELD_MATCH_NUMBER to matchNumber,
+            FIELD_HOME_TEAM_ID to homeTeamId,
+            FIELD_AWAY_TEAM_ID to awayTeamId,
+            FIELD_HOME_SCORE to homeScore,
+            FIELD_AWAY_SCORE to awayScore,
+            FIELD_STATUS to status.name,
+            FIELD_DATE to date.toString()
         )
+    }
+
+    private fun createMatchDocumentId(match: Match): String {
+        return buildString {
+            append(match.date.toLocalDate())
+            append("_game_")
+            append(match.matchNumber)
+        }
+    }
+
+    private companion object {
+        const val MATCHES_COLLECTION = "matches"
+
+        const val FIELD_MATCH_NUMBER = "matchNumber"
+        const val FIELD_HOME_TEAM_ID = "homeTeamId"
+        const val FIELD_AWAY_TEAM_ID = "awayTeamId"
+        const val FIELD_HOME_SCORE = "homeScore"
+        const val FIELD_AWAY_SCORE = "awayScore"
+        const val FIELD_STATUS = "status"
+        const val FIELD_DATE = "date"
+
+        val matchComparator =
+            compareBy<Match> { match ->
+                match.date.toLocalDate()
+            }.thenBy { match ->
+                match.matchNumber ?: Int.MAX_VALUE
+            }.thenBy { match ->
+                match.date
+            }
     }
 }

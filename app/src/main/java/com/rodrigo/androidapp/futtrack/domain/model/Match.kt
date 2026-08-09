@@ -11,6 +11,7 @@ enum class MatchStatus {
 
 data class Match(
     val id: String = UUID.randomUUID().toString(),
+    val matchNumber: Int? = null,
     val homeTeamId: String,
     val awayTeamId: String,
     val homeScore: Int? = null,

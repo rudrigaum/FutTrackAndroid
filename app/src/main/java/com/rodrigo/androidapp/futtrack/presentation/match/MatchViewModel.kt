@@ -3,6 +3,7 @@ package com.rodrigo.androidapp.futtrack.presentation.match
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rodrigo.androidapp.futtrack.domain.model.Match
+import com.rodrigo.androidapp.futtrack.domain.model.MatchSlot
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.Team
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
@@ -20,7 +21,6 @@ import javax.inject.Inject
 data class MatchUiState(
     val isLoading: Boolean = true,
     val availableTeams: List<Team> = emptyList(),
-    // Agora enviamos para a tela um mapa agrupado pela data
     val groupedMatches: Map<LocalDate, List<Match>> = emptyMap()
 )
 
@@ -30,35 +30,67 @@ class MatchViewModel @Inject constructor(
     private val matchRepository: MatchRepository
 ) : ViewModel() {
 
-    private val cutoffDate = LocalDateTime.of(2026, 5, 31, 23, 59)
-
     val uiState: StateFlow<MatchUiState> = combine(
         teamRepository.getTeams(),
         matchRepository.getMatches()
     ) { teams, matches ->
-
-        val visibleMatches = matches.filter { it.date.isAfter(cutoffDate) }
-        val grouped = visibleMatches.groupBy { it.date.toLocalDate() }
+        val groupedMatches = matches
+            .filter(::isVisibleMatch)
+            .groupBy { match ->
+                match.date.toLocalDate()
+            }
+            .mapValues { (_, matchesForDate) ->
+                matchesForDate.sortedWith(matchComparator)
+            }
 
         MatchUiState(
             isLoading = false,
             availableTeams = teams,
-            groupedMatches = grouped
+            groupedMatches = groupedMatches
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = MatchUiState(isLoading = true)
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = MatchUiState()
     )
 
-    fun scheduleNewMatch(homeTeamId: String, awayTeamId: String, date: LocalDateTime) {
+    fun getAvailableMatchSlots(
+        date: LocalDate
+    ): List<MatchSlot> {
+        val usedMatchNumbers = uiState.value
+            .groupedMatches[date]
+            .orEmpty()
+            .mapNotNull(Match::matchNumber)
+            .toSet()
+
+        return MatchSlot.entries.filterNot { slot ->
+            slot.matchNumber in usedMatchNumbers
+        }
+    }
+
+    fun scheduleNewMatch(
+        homeTeamId: String,
+        awayTeamId: String,
+        date: LocalDate,
+        slot: MatchSlot
+    ) {
+        if (homeTeamId == awayTeamId) {
+            return
+        }
+
+        if (slot !in getAvailableMatchSlots(date)) {
+            return
+        }
+
+        val match = Match(
+            matchNumber = slot.matchNumber,
+            homeTeamId = homeTeamId,
+            awayTeamId = awayTeamId,
+            date = date.atTime(slot.startTime)
+        )
+
         viewModelScope.launch {
-            val newMatch = Match(
-                homeTeamId = homeTeamId,
-                awayTeamId = awayTeamId,
-                date = date
-            )
-            matchRepository.scheduleMatch(newMatch)
+            matchRepository.scheduleMatch(match)
         }
     }
 
@@ -68,18 +100,49 @@ class MatchViewModel @Inject constructor(
         }
     }
 
-    fun finishMatch(matchId: String, homeScore: Int, awayScore: Int) {
+    fun finishMatch(
+        matchId: String,
+        homeScore: Int,
+        awayScore: Int
+    ) {
         viewModelScope.launch {
-            val allMatches = uiState.value.groupedMatches.values.flatten()
-            val match = allMatches.find { it.id == matchId }
-            if (match != null) {
-                val updatedMatch = match.copy(
-                    homeScore = homeScore,
-                    awayScore = awayScore,
-                    status = MatchStatus.FINISHED
-                )
-                matchRepository.updateMatch(updatedMatch)
-            }
+            val match = findMatch(matchId)
+                ?: return@launch
+
+            val updatedMatch = match.copy(
+                homeScore = homeScore,
+                awayScore = awayScore,
+                status = MatchStatus.FINISHED
+            )
+
+            matchRepository.updateMatch(updatedMatch)
         }
+    }
+
+    private fun findMatch(matchId: String): Match? {
+        return uiState.value
+            .groupedMatches
+            .values
+            .asSequence()
+            .flatten()
+            .find { match ->
+                match.id == matchId
+            }
+    }
+
+    private fun isVisibleMatch(match: Match): Boolean {
+        return match.date.isAfter(HISTORICAL_MATCHES_CUTOFF)
+    }
+
+    private companion object {
+        val HISTORICAL_MATCHES_CUTOFF =
+            LocalDateTime.of(2026, 5, 31, 23, 59)
+
+        val matchComparator =
+            compareBy<Match> { match ->
+                match.matchNumber ?: Int.MAX_VALUE
+            }.thenBy { match ->
+                match.date
+            }
     }
 }
