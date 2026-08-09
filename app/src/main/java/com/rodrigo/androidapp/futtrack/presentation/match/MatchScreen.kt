@@ -2,6 +2,7 @@ package com.rodrigo.androidapp.futtrack.presentation.match
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -49,6 +52,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -123,6 +128,16 @@ fun MatchScreen(
     var expandedMatchSlot by remember { mutableStateOf(false) }
     var selectedMatchSlot by remember { mutableStateOf<MatchSlot?>(null) }
 
+    var expandedDates by rememberSaveable(
+        stateSaver = expandedDatesSaver
+    ) {
+        mutableStateOf<Set<LocalDate>>(emptySet())
+    }
+
+    var hasInitializedExpandedDates by rememberSaveable {
+        mutableStateOf(false)
+    }
+
     val datePickerState = rememberDatePickerState()
     var matchToScore by remember { mutableStateOf<Match?>(null) }
 
@@ -130,7 +145,31 @@ fun MatchScreen(
         ?.let(getAvailableMatchSlots)
         .orEmpty()
 
-    LaunchedEffect(availableMatchSlots, selectedMatchSlot) {
+    val groupedDates = uiState.groupedMatches.keys.toList()
+
+    LaunchedEffect(groupedDates) {
+        when {
+            groupedDates.isEmpty() -> {
+                expandedDates = emptySet()
+                hasInitializedExpandedDates = false
+            }
+
+            !hasInitializedExpandedDates -> {
+                expandedDates = setOf(groupedDates.first())
+                hasInitializedExpandedDates = true
+            }
+
+            else -> {
+                expandedDates =
+                    expandedDates.intersect(groupedDates.toSet())
+            }
+        }
+    }
+
+    LaunchedEffect(
+        availableMatchSlots,
+        selectedMatchSlot
+    ) {
         if (
             selectedMatchSlot != null &&
             selectedMatchSlot !in availableMatchSlots
@@ -146,7 +185,8 @@ fun MatchScreen(
     }
 
     val canSelectSlot =
-        selectedDate != null && availableMatchSlots.isNotEmpty()
+        selectedDate != null &&
+                availableMatchSlots.isNotEmpty()
 
     val canSchedule =
         selectedHome != null &&
@@ -298,7 +338,9 @@ fun MatchScreen(
 
                                 Text(
                                     text = selectedDate?.format(
-                                        DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                                        DateTimeFormatter.ofPattern(
+                                            "dd/MM/yyyy"
+                                        )
                                     ) ?: "Selecionar Data"
                                 )
                             }
@@ -361,51 +403,49 @@ fun MatchScreen(
                 LazyColumn(
                     modifier = Modifier.weight(1f)
                 ) {
-                    uiState.groupedMatches
-                        .toSortedMap()
-                        .forEach { (date, matchesForDate) ->
-                            stickyHeader {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    val dateText = date
-                                        .format(
-                                            DateTimeFormatter.ofPattern(
-                                                "EEEE, dd/MM/yyyy",
-                                                Locale("pt", "BR")
-                                            )
-                                        )
-                                        .uppercase()
+                    uiState.groupedMatches.forEach { (date, matchesForDate) ->
+                        val isExpanded = date in expandedDates
 
-                                    Text(
-                                        text = dateText,
-                                        modifier = Modifier.padding(
-                                            vertical = 8.dp,
-                                            horizontal = 12.dp
-                                        ),
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                        stickyHeader(
+                            key = "header-$date"
+                        ) {
+                            MatchDateHeader(
+                                date = date,
+                                matchCount = matchesForDate.size,
+                                isExpanded = isExpanded,
+                                onToggle = {
+                                    expandedDates = if (isExpanded) {
+                                        expandedDates - date
+                                    } else {
+                                        expandedDates + date
+                                    }
                                 }
-                            }
+                            )
+                        }
 
+                        if (isExpanded) {
                             items(
                                 items = matchesForDate,
                                 key = Match::id
                             ) { match ->
                                 val homeName = uiState.availableTeams
-                                    .find { it.id == match.homeTeamId }
+                                    .find { team ->
+                                        team.id == match.homeTeamId
+                                    }
                                     ?.name
                                     ?: "Desconhecido"
 
                                 val awayName = uiState.availableTeams
-                                    .find { it.id == match.awayTeamId }
+                                    .find { team ->
+                                        team.id == match.awayTeamId
+                                    }
                                     ?.name
                                     ?: "Desconhecido"
 
                                 Box(
-                                    modifier = Modifier.padding(vertical = 4.dp)
+                                    modifier = Modifier.padding(
+                                        vertical = 4.dp
+                                    )
                                 ) {
                                     MatchItem(
                                         match = match,
@@ -422,6 +462,7 @@ fun MatchScreen(
                                 }
                             }
                         }
+                    }
                 }
             }
         }
@@ -429,12 +470,16 @@ fun MatchScreen(
 
     matchToScore?.let { match ->
         val homeName = uiState.availableTeams
-            .find { it.id == match.homeTeamId }
+            .find { team ->
+                team.id == match.homeTeamId
+            }
             ?.name
             ?: "Mandante"
 
         val awayName = uiState.availableTeams
-            .find { it.id == match.awayTeamId }
+            .find { team ->
+                team.id == match.awayTeamId
+            }
             ?.name
             ?: "Visitante"
 
@@ -456,6 +501,64 @@ fun MatchScreen(
                 matchToScore = null
             }
         )
+    }
+}
+
+@Composable
+private fun MatchDateHeader(
+    date: LocalDate,
+    matchCount: Int,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = 12.dp,
+                vertical = 10.dp
+            ),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = date
+                        .format(MATCH_DATE_FORMATTER)
+                        .uppercase(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = "$matchCount ${
+                        if (matchCount == 1) "jogo" else "jogos"
+                    }",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Icon(
+                imageVector = if (isExpanded) {
+                    Icons.Default.KeyboardArrowUp
+                } else {
+                    Icons.Default.KeyboardArrowDown
+                },
+                contentDescription = if (isExpanded) {
+                    "Recolher jogos"
+                } else {
+                    "Expandir jogos"
+                },
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -842,6 +945,38 @@ fun ScoreInputRow(
 }
 
 @Preview(
+    name = "Expanded Match Date Header",
+    showBackground = true
+)
+@Composable
+private fun ExpandedMatchDateHeaderPreview() {
+    FutTrackTheme {
+        MatchDateHeader(
+            date = LocalDate.of(2026, 8, 15),
+            matchCount = 6,
+            isExpanded = true,
+            onToggle = {}
+        )
+    }
+}
+
+@Preview(
+    name = "Collapsed Match Date Header",
+    showBackground = true
+)
+@Composable
+private fun CollapsedMatchDateHeaderPreview() {
+    FutTrackTheme {
+        MatchDateHeader(
+            date = LocalDate.of(2026, 8, 22),
+            matchCount = 6,
+            isExpanded = false,
+            onToggle = {}
+        )
+    }
+}
+
+@Preview(
     name = "Match Slot Dropdown",
     showBackground = true
 )
@@ -865,8 +1000,28 @@ private fun MatchSlotDropdownPreview() {
 }
 
 private fun MatchSlot.displayLabel(): String {
-    return "Jogo $matchNumber — ${startTime.format(MATCH_TIME_FORMATTER)}"
+    return "Jogo $matchNumber — ${
+        startTime.format(MATCH_TIME_FORMATTER)
+    }"
 }
+
+private val expandedDatesSaver =
+    listSaver<Set<LocalDate>, String>(
+        save = { dates ->
+            dates.map(LocalDate::toString)
+        },
+        restore = { savedDates ->
+            savedDates
+                .map(LocalDate::parse)
+                .toSet()
+        }
+    )
+
+private val MATCH_DATE_FORMATTER =
+    DateTimeFormatter.ofPattern(
+        "EEEE, dd/MM/yyyy",
+        Locale("pt", "BR")
+    )
 
 private val MATCH_TIME_FORMATTER =
     DateTimeFormatter.ofPattern("HH:mm")

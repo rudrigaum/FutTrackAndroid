@@ -42,6 +42,7 @@ class MatchViewModelTest {
         Dispatchers.setMain(testDispatcher)
 
         matchRepository = FakeMatchRepository()
+
         teamRepository = FakeTeamRepository(
             initialTeams = TEST_TEAMS
         )
@@ -122,6 +123,51 @@ class MatchViewModelTest {
 
             assertTrue(
                 MatchSlot.GAME_2 in availableSlots
+            )
+        }
+
+    @Test
+    fun `should order match groups by latest date first`() =
+        runTest(testDispatcher) {
+            val oldestDate = TEST_DATE
+            val middleDate = TEST_DATE.plusDays(7)
+            val latestDate = TEST_DATE.plusDays(14)
+
+            matchRepository.setMatches(
+                listOf(
+                    createMatch(
+                        id = "middle-round",
+                        slot = MatchSlot.GAME_1,
+                        date = middleDate
+                    ),
+                    createMatch(
+                        id = "oldest-round",
+                        slot = MatchSlot.GAME_1,
+                        date = oldestDate
+                    ),
+                    createMatch(
+                        id = "latest-round",
+                        slot = MatchSlot.GAME_1,
+                        date = latestDate
+                    )
+                )
+            )
+
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            val groupedDates =
+                viewModel.uiState.value.groupedMatches.keys.toList()
+
+            assertEquals(
+                listOf(
+                    latestDate,
+                    middleDate,
+                    oldestDate
+                ),
+                groupedDates
             )
         }
 
