@@ -21,12 +21,12 @@ val youtubeKey = localProperties.getProperty("YOUTUBE_API_KEY") ?: "\"\""
 
 android {
     namespace = "com.rodrigo.androidapp.futtrack"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.rodrigo.androidapp.futtrack"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
