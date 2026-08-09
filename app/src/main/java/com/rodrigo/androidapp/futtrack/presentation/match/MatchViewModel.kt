@@ -34,19 +34,10 @@ class MatchViewModel @Inject constructor(
         teamRepository.getTeams(),
         matchRepository.getMatches()
     ) { teams, matches ->
-        val groupedMatches = matches
-            .filter(::isVisibleMatch)
-            .groupBy { match ->
-                match.date.toLocalDate()
-            }
-            .mapValues { (_, matchesForDate) ->
-                matchesForDate.sortedWith(matchComparator)
-            }
-
         MatchUiState(
             isLoading = false,
             availableTeams = teams,
-            groupedMatches = groupedMatches
+            groupedMatches = groupAndSortMatches(matches)
         )
     }.stateIn(
         scope = viewModelScope,
@@ -117,6 +108,24 @@ class MatchViewModel @Inject constructor(
 
             matchRepository.updateMatch(updatedMatch)
         }
+    }
+
+    private fun groupAndSortMatches(
+        matches: List<Match>
+    ): Map<LocalDate, List<Match>> {
+        return matches
+            .filter(::isVisibleMatch)
+            .groupBy { match ->
+                match.date.toLocalDate()
+            }
+            .toSortedMap(
+                compareByDescending { date ->
+                    date
+                }
+            )
+            .mapValues { (_, matchesForDate) ->
+                matchesForDate.sortedWith(matchComparator)
+            }
     }
 
     private fun findMatch(matchId: String): Match? {
