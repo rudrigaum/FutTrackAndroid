@@ -44,6 +44,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,18 +55,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.R
 import com.rodrigo.androidapp.futtrack.domain.model.Match
+import com.rodrigo.androidapp.futtrack.domain.model.MatchSlot
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.Team
 import com.rodrigo.androidapp.futtrack.presentation.auth.AuthViewModel
+import com.rodrigo.androidapp.futtrack.ui.theme.FutTrackTheme
 import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -81,51 +84,114 @@ fun MatchRoute(
     MatchScreen(
         uiState = uiState,
         isAdminMode = authUiState.isAdminMode,
-        onScheduleMatch = { home, away, date ->
-            viewModel.scheduleNewMatch(home.id, away.id, date)
+        getAvailableMatchSlots = viewModel::getAvailableMatchSlots,
+        onScheduleMatch = { home, away, date, slot ->
+            viewModel.scheduleNewMatch(
+                homeTeamId = home.id,
+                awayTeamId = away.id,
+                date = date,
+                slot = slot
+            )
         },
-        onDeleteMatch = { matchId ->
-            viewModel.deleteMatch(matchId)
-        },
-        onFinishMatch = { matchId, homeScore, awayScore ->
-            viewModel.finishMatch(matchId, homeScore, awayScore)
-        }
+        onDeleteMatch = viewModel::deleteMatch,
+        onFinishMatch = viewModel::finishMatch
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalFoundationApi::class
+)
 @Composable
 fun MatchScreen(
     uiState: MatchUiState,
     isAdminMode: Boolean,
-    onScheduleMatch: (Team, Team, LocalDateTime) -> Unit,
+    getAvailableMatchSlots: (LocalDate) -> List<MatchSlot>,
+    onScheduleMatch: (Team, Team, LocalDate, MatchSlot) -> Unit,
     onDeleteMatch: (String) -> Unit,
     onFinishMatch: (String, Int, Int) -> Unit
 ) {
     var expandedHome by remember { mutableStateOf(false) }
     var selectedHome by remember { mutableStateOf<Team?>(null) }
+
     var expandedAway by remember { mutableStateOf(false) }
     var selectedAway by remember { mutableStateOf<Team?>(null) }
+
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+
+    var expandedMatchSlot by remember { mutableStateOf(false) }
+    var selectedMatchSlot by remember { mutableStateOf<MatchSlot?>(null) }
+
     val datePickerState = rememberDatePickerState()
     var matchToScore by remember { mutableStateOf<Match?>(null) }
 
+    val availableMatchSlots = selectedDate
+        ?.let(getAvailableMatchSlots)
+        .orEmpty()
+
+    LaunchedEffect(availableMatchSlots, selectedMatchSlot) {
+        if (
+            selectedMatchSlot != null &&
+            selectedMatchSlot !in availableMatchSlots
+        ) {
+            selectedMatchSlot = null
+        }
+    }
+
+    val slotPlaceholder = when {
+        selectedDate == null -> "Selecione a data primeiro"
+        availableMatchSlots.isEmpty() -> "Rodada completa"
+        else -> "Selecione..."
+    }
+
+    val canSelectSlot =
+        selectedDate != null && availableMatchSlots.isNotEmpty()
+
+    val canSchedule =
+        selectedHome != null &&
+                selectedAway != null &&
+                selectedHome != selectedAway &&
+                selectedDate != null &&
+                selectedMatchSlot != null &&
+                selectedMatchSlot in availableMatchSlots
+
     if (showDatePicker) {
         DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
+            onDismissRequest = {
+                showDatePicker = false
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        selectedDate = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneId.of("UTC"))
-                            .toLocalDate()
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val newDate = Instant
+                                .ofEpochMilli(millis)
+                                .atZone(ZoneId.of("UTC"))
+                                .toLocalDate()
+
+                            if (newDate != selectedDate) {
+                                selectedMatchSlot = null
+                                expandedMatchSlot = false
+                            }
+
+                            selectedDate = newDate
+                        }
+
+                        showDatePicker = false
                     }
-                    showDatePicker = false
-                }) { Text("OK") }
+                ) {
+                    Text("OK")
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
+                TextButton(
+                    onClick = {
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("Cancelar")
+                }
             }
         ) {
             DatePicker(state = datePickerState)
@@ -136,14 +202,18 @@ fun MatchScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Image(
                             painter = painterResource(id = R.drawable.logo_bal),
                             contentDescription = "Logo BAL",
                             modifier = Modifier.height(40.dp),
                             contentScale = ContentScale.Fit
                         )
+
                         Spacer(modifier = Modifier.width(12.dp))
+
                         Text(
                             text = "Baba Amigos do Lelé",
                             style = MaterialTheme.typography.titleMedium,
@@ -159,7 +229,10 @@ fun MatchScreen(
         }
     ) { paddingValues ->
         if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
                 CircularProgressIndicator()
             }
         } else {
@@ -170,39 +243,109 @@ fun MatchScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // <-- Substituímos o AppConfig pelo nosso Estado Reativo
                 if (isAdminMode) {
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text("Agendar Novo Jogo", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = "Agendar Novo Jogo",
+                                style = MaterialTheme.typography.titleMedium
+                            )
 
-                            TeamDropdown("Time Mandante", uiState.availableTeams, selectedHome, expandedHome, { expandedHome = it }) { selectedHome = it; expandedHome = false }
-                            TeamDropdown("Time Visitante", uiState.availableTeams, selectedAway, expandedAway, { expandedAway = it }) { selectedAway = it; expandedAway = false }
+                            TeamDropdown(
+                                label = "Time Mandante",
+                                teams = uiState.availableTeams,
+                                selectedTeam = selectedHome,
+                                expanded = expandedHome,
+                                onExpandedChange = {
+                                    expandedHome = it
+                                },
+                                onTeamSelected = {
+                                    selectedHome = it
+                                    expandedHome = false
+                                }
+                            )
+
+                            TeamDropdown(
+                                label = "Time Visitante",
+                                teams = uiState.availableTeams,
+                                selectedTeam = selectedAway,
+                                expanded = expandedAway,
+                                onExpandedChange = {
+                                    expandedAway = it
+                                },
+                                onTeamSelected = {
+                                    selectedAway = it
+                                    expandedAway = false
+                                }
+                            )
 
                             OutlinedButton(
-                                onClick = { showDatePicker = true },
+                                onClick = {
+                                    showDatePicker = true
+                                },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.DateRange, contentDescription = "Calendário", modifier = Modifier.padding(end = 8.dp))
-                                Text(selectedDate?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) ?: "Selecionar Data")
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Calendário",
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+
+                                Text(
+                                    text = selectedDate?.format(
+                                        DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                                    ) ?: "Selecionar Data"
+                                )
                             }
+
+                            MatchSlotDropdown(
+                                availableSlots = availableMatchSlots,
+                                selectedSlot = selectedMatchSlot,
+                                placeholder = slotPlaceholder,
+                                expanded = expandedMatchSlot,
+                                enabled = canSelectSlot,
+                                onExpandedChange = {
+                                    expandedMatchSlot = it
+                                },
+                                onSlotSelected = { slot ->
+                                    selectedMatchSlot = slot
+                                    expandedMatchSlot = false
+                                }
+                            )
 
                             Button(
                                 onClick = {
-                                    if (selectedHome != null && selectedAway != null && selectedDate != null) {
-                                        val matchDateTime = selectedDate!!.atTime(9, 0)
-                                        onScheduleMatch(selectedHome!!, selectedAway!!, matchDateTime)
+                                    val home = selectedHome
+                                    val away = selectedAway
+                                    val date = selectedDate
+                                    val slot = selectedMatchSlot
+
+                                    if (
+                                        home != null &&
+                                        away != null &&
+                                        home != away &&
+                                        date != null &&
+                                        slot != null
+                                    ) {
+                                        onScheduleMatch(
+                                            home,
+                                            away,
+                                            date,
+                                            slot
+                                        )
 
                                         selectedHome = null
                                         selectedAway = null
-                                        selectedDate = null
+                                        selectedMatchSlot = null
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                enabled = selectedHome != null && selectedAway != null && selectedHome != selectedAway && selectedDate != null
+                                enabled = canSchedule
                             ) {
                                 Text("Agendar")
                             }
@@ -210,58 +353,106 @@ fun MatchScreen(
                     }
                 }
 
-                Text("Próximos Jogos", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "Próximos Jogos",
+                    style = MaterialTheme.typography.titleMedium
+                )
 
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    uiState.groupedMatches.toSortedMap().forEach { (date, matchesForDate) ->
-                        stickyHeader {
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                val dateStr = date.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", Locale("pt", "BR"))).uppercase()
-                                Text(
-                                    text = dateStr,
-                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                LazyColumn(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    uiState.groupedMatches
+                        .toSortedMap()
+                        .forEach { (date, matchesForDate) ->
+                            stickyHeader {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    val dateText = date
+                                        .format(
+                                            DateTimeFormatter.ofPattern(
+                                                "EEEE, dd/MM/yyyy",
+                                                Locale("pt", "BR")
+                                            )
+                                        )
+                                        .uppercase()
+
+                                    Text(
+                                        text = dateText,
+                                        modifier = Modifier.padding(
+                                            vertical = 8.dp,
+                                            horizontal = 12.dp
+                                        ),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            items(
+                                items = matchesForDate,
+                                key = Match::id
+                            ) { match ->
+                                val homeName = uiState.availableTeams
+                                    .find { it.id == match.homeTeamId }
+                                    ?.name
+                                    ?: "Desconhecido"
+
+                                val awayName = uiState.availableTeams
+                                    .find { it.id == match.awayTeamId }
+                                    ?.name
+                                    ?: "Desconhecido"
+
+                                Box(
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                ) {
+                                    MatchItem(
+                                        match = match,
+                                        homeName = homeName,
+                                        awayName = awayName,
+                                        isAdminMode = isAdminMode,
+                                        onDelete = {
+                                            onDeleteMatch(match.id)
+                                        },
+                                        onScoreClick = {
+                                            matchToScore = match
+                                        }
+                                    )
+                                }
                             }
                         }
-
-                        items(matchesForDate) { match ->
-                            val homeName = uiState.availableTeams.find { it.id == match.homeTeamId }?.name ?: "Desconhecido"
-                            val awayName = uiState.availableTeams.find { it.id == match.awayTeamId }?.name ?: "Desconhecido"
-
-                            Box(modifier = Modifier.padding(vertical = 4.dp)) {
-                                MatchItem(
-                                    match = match,
-                                    homeName = homeName,
-                                    awayName = awayName,
-                                    isAdminMode = isAdminMode,
-                                    onDelete = { onDeleteMatch(match.id) },
-                                    onScoreClick = { matchToScore = match }
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
     }
 
     matchToScore?.let { match ->
-        val homeName = uiState.availableTeams.find { it.id == match.homeTeamId }?.name ?: "Mandante"
-        val awayName = uiState.availableTeams.find { it.id == match.awayTeamId }?.name ?: "Visitante"
+        val homeName = uiState.availableTeams
+            .find { it.id == match.homeTeamId }
+            ?.name
+            ?: "Mandante"
+
+        val awayName = uiState.availableTeams
+            .find { it.id == match.awayTeamId }
+            ?.name
+            ?: "Visitante"
 
         ScoreDialog(
             homeName = homeName,
             awayName = awayName,
             initialHomeScore = match.homeScore ?: 0,
             initialAwayScore = match.awayScore ?: 0,
-            onDismiss = { matchToScore = null },
+            onDismiss = {
+                matchToScore = null
+            },
             onConfirm = { homeScore, awayScore ->
-                onFinishMatch(match.id, homeScore, awayScore)
+                onFinishMatch(
+                    match.id,
+                    homeScore,
+                    awayScore
+                )
+
                 matchToScore = null
             }
         )
@@ -270,14 +461,110 @@ fun MatchScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TeamDropdown(label: String, teams: List<Team>, selectedTeam: Team?, expanded: Boolean, onExpandedChange: (Boolean) -> Unit, onTeamSelected: (Team) -> Unit) {
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = onExpandedChange) {
+fun TeamDropdown(
+    label: String,
+    teams: List<Team>,
+    selectedTeam: Team?,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onTeamSelected: (Team) -> Unit
+) {
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = onExpandedChange
+    ) {
         OutlinedTextField(
-            value = selectedTeam?.name ?: "Selecione...", onValueChange = {}, readOnly = true, label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }, modifier = Modifier.menuAnchor().fillMaxWidth()
+            value = selectedTeam?.name ?: "Selecione...",
+            onValueChange = {},
+            readOnly = true,
+            label = {
+                Text(label)
+            },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(
+                    expanded = expanded
+                )
+            },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
-            teams.forEach { team -> DropdownMenuItem(text = { Text(team.name) }, onClick = { onTeamSelected(team) }) }
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = {
+                onExpandedChange(false)
+            }
+        ) {
+            teams.forEach { team ->
+                DropdownMenuItem(
+                    text = {
+                        Text(team.name)
+                    },
+                    onClick = {
+                        onTeamSelected(team)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MatchSlotDropdown(
+    availableSlots: List<MatchSlot>,
+    selectedSlot: MatchSlot?,
+    placeholder: String,
+    expanded: Boolean,
+    enabled: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSlotSelected: (MatchSlot) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { shouldExpand ->
+            if (enabled) {
+                onExpandedChange(shouldExpand)
+            }
+        },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = selectedSlot?.displayLabel() ?: placeholder,
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            label = {
+                Text("Número do Jogo")
+            },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(
+                    expanded = expanded
+                )
+            },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = {
+                onExpandedChange(false)
+            }
+        ) {
+            availableSlots.forEach { slot ->
+                DropdownMenuItem(
+                    text = {
+                        Text(slot.displayLabel())
+                    },
+                    onClick = {
+                        onSlotSelected(slot)
+                    }
+                )
+            }
         }
     }
 }
@@ -304,22 +591,48 @@ fun MatchItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                match.matchNumber?.let { number ->
+                    Text(
+                        text = "Jogo $number • ${
+                            match.date.format(MATCH_TIME_FORMATTER)
+                        }",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
 
-            Column(modifier = Modifier.weight(1f)) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Image(
-                        painter = painterResource(id = getTeamCrest(match.homeTeamId)),
+                        painter = painterResource(
+                            id = getTeamCrest(match.homeTeamId)
+                        ),
                         contentDescription = null,
                         modifier = Modifier.size(28.dp)
                     )
+
                     Spacer(modifier = Modifier.width(12.dp))
+
                     Text(
                         text = homeName,
                         style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (match.status == MatchStatus.FINISHED) FontWeight.Bold else FontWeight.Normal,
+                        fontWeight = if (
+                            match.status == MatchStatus.FINISHED
+                        ) {
+                            FontWeight.Bold
+                        } else {
+                            FontWeight.Normal
+                        },
                         modifier = Modifier.weight(1f)
                     )
+
                     if (match.status == MatchStatus.FINISHED) {
                         Text(
                             text = match.homeScore.toString(),
@@ -331,19 +644,32 @@ fun MatchItem(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Image(
-                        painter = painterResource(id = getTeamCrest(match.awayTeamId)),
+                        painter = painterResource(
+                            id = getTeamCrest(match.awayTeamId)
+                        ),
                         contentDescription = null,
                         modifier = Modifier.size(28.dp)
                     )
+
                     Spacer(modifier = Modifier.width(12.dp))
+
                     Text(
                         text = awayName,
                         style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (match.status == MatchStatus.FINISHED) FontWeight.Bold else FontWeight.Normal,
+                        fontWeight = if (
+                            match.status == MatchStatus.FINISHED
+                        ) {
+                            FontWeight.Bold
+                        } else {
+                            FontWeight.Normal
+                        },
                         modifier = Modifier.weight(1f)
                     )
+
                     if (match.status == MatchStatus.FINISHED) {
                         Text(
                             text = match.awayScore.toString(),
@@ -356,18 +682,37 @@ fun MatchItem(
 
             if (isAdminMode) {
                 Spacer(modifier = Modifier.width(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     if (match.status == MatchStatus.FINISHED) {
-                        IconButton(onClick = onScoreClick) {
-                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Editar Placar", tint = MaterialTheme.colorScheme.secondary)
+                        IconButton(
+                            onClick = onScoreClick
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Editar Placar",
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
                         }
                     } else {
-                        OutlinedButton(onClick = onScoreClick, modifier = Modifier.padding(end = 8.dp)) {
+                        OutlinedButton(
+                            onClick = onScoreClick,
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
                             Text("Placar")
                         }
                     }
-                    IconButton(onClick = onDelete) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Deletar Partida", tint = MaterialTheme.colorScheme.error)
+
+                    IconButton(
+                        onClick = onDelete
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Deletar Partida",
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
@@ -384,31 +729,144 @@ fun ScoreDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int, Int) -> Unit
 ) {
-    var homeScore by remember { mutableIntStateOf(initialHomeScore) }
-    var awayScore by remember { mutableIntStateOf(initialAwayScore) }
+    var homeScore by remember {
+        mutableIntStateOf(initialHomeScore)
+    }
+
+    var awayScore by remember {
+        mutableIntStateOf(initialAwayScore)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initialHomeScore > 0 || initialAwayScore > 0) "Editar Placar" else "Lançar Placar Final") },
+        title = {
+            Text(
+                if (initialHomeScore > 0 || initialAwayScore > 0) {
+                    "Editar Placar"
+                } else {
+                    "Lançar Placar Final"
+                }
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                ScoreInputRow(teamName = homeName, score = homeScore, onScoreChange = { homeScore = it })
-                ScoreInputRow(teamName = awayName, score = awayScore, onScoreChange = { awayScore = it })
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                ScoreInputRow(
+                    teamName = homeName,
+                    score = homeScore,
+                    onScoreChange = {
+                        homeScore = it
+                    }
+                )
+
+                ScoreInputRow(
+                    teamName = awayName,
+                    score = awayScore,
+                    onScoreChange = {
+                        awayScore = it
+                    }
+                )
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(homeScore, awayScore) }) { Text("Salvar") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(homeScore, awayScore)
+                }
+            ) {
+                Text("Salvar")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text("Cancelar")
+            }
+        }
     )
 }
 
 @Composable
-fun ScoreInputRow(teamName: String, score: Int, onScoreChange: (Int) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-        Text(text = teamName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { if (score > 0) onScoreChange(score - 1) }) { Text("-", style = MaterialTheme.typography.titleLarge) }
-            Text(text = score.toString(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 16.dp))
-            IconButton(onClick = { onScoreChange(score + 1) }) { Icon(Icons.Default.Add, contentDescription = "Adicionar") }
+fun ScoreInputRow(
+    teamName: String,
+    score: Int,
+    onScoreChange: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = teamName,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = {
+                    if (score > 0) {
+                        onScoreChange(score - 1)
+                    }
+                }
+            ) {
+                Text(
+                    text = "-",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
+
+            Text(
+                text = score.toString(),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            IconButton(
+                onClick = {
+                    onScoreChange(score + 1)
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Adicionar"
+                )
+            }
         }
     }
 }
+
+@Preview(
+    name = "Match Slot Dropdown",
+    showBackground = true
+)
+@Composable
+private fun MatchSlotDropdownPreview() {
+    FutTrackTheme {
+        Box(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            MatchSlotDropdown(
+                availableSlots = MatchSlot.entries,
+                selectedSlot = MatchSlot.GAME_3,
+                placeholder = "Selecione...",
+                expanded = false,
+                enabled = true,
+                onExpandedChange = {},
+                onSlotSelected = {}
+            )
+        }
+    }
+}
+
+private fun MatchSlot.displayLabel(): String {
+    return "Jogo $matchNumber — ${startTime.format(MATCH_TIME_FORMATTER)}"
+}
+
+private val MATCH_TIME_FORMATTER =
+    DateTimeFormatter.ofPattern("HH:mm")
