@@ -17,6 +17,16 @@ val localProperties = Properties().apply {
         load(FileInputStream(localPropertiesFile))
     }
 }
+
+val keystoreProperties = Properties().apply {
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
+
+    if (keystorePropertiesFile.exists()) {
+        load(FileInputStream(keystorePropertiesFile))
+    }
+}
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
 val youtubeKey = localProperties.getProperty("YOUTUBE_API_KEY") ?: "\"\""
 
 android {
@@ -28,17 +38,44 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "YOUTUBE_API_KEY", youtubeKey)
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(
+                    keystoreProperties.getProperty("storeFile")
+                )
+
+                storePassword =
+                    keystoreProperties.getProperty("storePassword")
+
+                keyAlias =
+                    keystoreProperties.getProperty("keyAlias")
+
+                keyPassword =
+                    keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (keystorePropertiesFile.exists()) {
+                signingConfig =
+                    signingConfigs.getByName("release")
+            }
+
             isMinifyEnabled = false
+
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
+                getDefaultProguardFile(
+                    "proguard-android-optimize.txt"
+                ),
                 "proguard-rules.pro"
             )
         }
