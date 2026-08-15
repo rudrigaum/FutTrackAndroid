@@ -10,7 +10,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -28,10 +28,13 @@ import com.rodrigo.androidapp.futtrack.presentation.team.TeamPlayersRoute
 import com.rodrigo.androidapp.futtrack.presentation.topscorers.TopScorersRoute
 import com.rodrigo.androidapp.futtrack.presentation.video.navigation.VideoRoute
 import com.rodrigo.androidapp.futtrack.presentation.video.navigation.videoScreen
+import androidx.compose.ui.platform.LocalUriHandler
+import com.rodrigo.androidapp.futtrack.presentation.video.navigation.YouTubeUrlBuilder
 
 @Composable
 fun FuttrakMainScreen() {
     val navController = rememberNavController()
+    val uriHandler = LocalUriHandler.current
 
     val items = listOf(
         BottomNavItem.Teams,
@@ -120,7 +123,9 @@ fun FuttrakMainScreen() {
 
             videoScreen(
                 onVideoClick = { video ->
-                    println("Clicou no vídeo do YouTube: ${video.title}")
+                    uriHandler.openUri(
+                        YouTubeUrlBuilder.watchUrl(video.id)
+                    )
                 }
             )
         }
