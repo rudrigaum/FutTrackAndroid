@@ -1,10 +1,14 @@
 package com.rodrigo.androidapp.futtrack.presentation.video.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -60,11 +64,11 @@ fun VideoListContent(
         modifier = modifier,
         contentPadding = PaddingValues(
             start = 16.dp,
-            top = 20.dp,
+            top = 12.dp,
             end = 16.dp,
             bottom = 24.dp
         ),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         item(
             key = VIDEO_HEADER_KEY
@@ -74,21 +78,29 @@ fun VideoListContent(
             )
         }
 
-        items(
+        itemsIndexed(
             items = videos,
-            key = Video::id
-        ) { video ->
-            VideoCard(
-                video = video,
-                isPlaying = video.id == activeVideoId,
-                onPlayClick = onPlayClick,
-                playerContent = {
-                    VideoPlayerContent(
-                        video = video,
-                        onOpenExternallyClick = onOpenExternallyClick
-                    )
+            key = { _, video ->
+                video.id
+            }
+        ) { index, video ->
+            Column {
+                VideoCard(
+                    video = video,
+                    isPlaying = video.id == activeVideoId,
+                    onPlayClick = onPlayClick,
+                    playerContent = {
+                        VideoPlayerContent(
+                            video = video,
+                            onOpenExternallyClick = onOpenExternallyClick
+                        )
+                    }
+                )
+
+                if (index < videos.lastIndex) {
+                    VideoDivider()
                 }
-            )
+            }
         }
 
         if (
@@ -106,6 +118,19 @@ fun VideoListContent(
             }
         }
     }
+}
+
+@Composable
+private fun VideoDivider(
+    modifier: Modifier = Modifier
+) {
+    HorizontalDivider(
+        modifier = modifier.padding(
+            start = VIDEO_DIVIDER_START_PADDING
+        ),
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outlineVariant
+    )
 }
 
 private fun shouldRequestNextPage(
@@ -168,6 +193,8 @@ private fun VideoListLoadingMorePreview() {
 private const val LOAD_MORE_THRESHOLD = 4
 private const val VIDEO_HEADER_KEY = "video_header"
 private const val VIDEO_PAGINATION_KEY = "video_pagination"
+
+private val VIDEO_DIVIDER_START_PADDING = 144.dp
 
 private val previewVideos = listOf(
     Video(
