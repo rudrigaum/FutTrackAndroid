@@ -6,7 +6,20 @@ sealed interface VideoUiState {
 
     data object Loading : VideoUiState
 
-    data class Success(val videos: List<Video>) : VideoUiState
+    data class Success(
+        val videos: List<Video>,
+        val isLoadingMore: Boolean = false,
+        val hasNextPage: Boolean = true,
+        val loadMoreErrorMessage: String? = null
+    ) : VideoUiState {
 
-    data class Error(val message: String) : VideoUiState
+        val canLoadMore: Boolean
+            get() = hasNextPage &&
+                    !isLoadingMore &&
+                    loadMoreErrorMessage == null
+    }
+
+    data class Error(
+        val message: String
+    ) : VideoUiState
 }
