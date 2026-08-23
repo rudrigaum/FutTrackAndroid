@@ -2,8 +2,9 @@ package com.rodrigo.androidapp.futtrack.domain.usecase
 
 import com.rodrigo.androidapp.futtrack.domain.model.SemifinalStatus
 import com.rodrigo.androidapp.futtrack.domain.model.TeamStanding
+import javax.inject.Inject
 
-class CalculateSemifinalStatusUseCase {
+class CalculateSemifinalStatusUseCase @Inject constructor() {
 
     operator fun invoke(
         secondPlace: TeamStanding,
