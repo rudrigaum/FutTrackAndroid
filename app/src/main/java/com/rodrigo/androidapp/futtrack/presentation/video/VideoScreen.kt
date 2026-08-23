@@ -12,9 +12,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -52,10 +49,6 @@ fun VideoScreenContent(
     onRetryLoadMore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var activeVideoId by rememberSaveable {
-        mutableStateOf<String?>(null)
-    }
-
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -66,11 +59,7 @@ fun VideoScreenContent(
     ) { paddingValues ->
         VideoScreenState(
             uiState = uiState,
-            activeVideoId = activeVideoId,
-            onPlayClick = { video ->
-                activeVideoId = video.id
-            },
-            onOpenExternallyClick = onVideoClick,
+            onVideoClick = onVideoClick,
             onRetryClick = onRetryClick,
             onLoadMore = onLoadMore,
             onRetryLoadMore = onRetryLoadMore,
@@ -84,9 +73,7 @@ fun VideoScreenContent(
 @Composable
 private fun VideoScreenState(
     uiState: VideoUiState,
-    activeVideoId: String?,
-    onPlayClick: (Video) -> Unit,
-    onOpenExternallyClick: (Video) -> Unit,
+    onVideoClick: (Video) -> Unit,
     onRetryClick: () -> Unit,
     onLoadMore: () -> Unit,
     onRetryLoadMore: () -> Unit,
@@ -102,9 +89,7 @@ private fun VideoScreenState(
         is VideoUiState.Success -> {
             VideoSuccessContent(
                 state = uiState,
-                activeVideoId = activeVideoId,
-                onPlayClick = onPlayClick,
-                onOpenExternallyClick = onOpenExternallyClick,
+                onVideoClick = onVideoClick,
                 onLoadMore = onLoadMore,
                 onRetryLoadMore = onRetryLoadMore,
                 modifier = modifier
@@ -124,9 +109,7 @@ private fun VideoScreenState(
 @Composable
 private fun VideoSuccessContent(
     state: VideoUiState.Success,
-    activeVideoId: String?,
-    onPlayClick: (Video) -> Unit,
-    onOpenExternallyClick: (Video) -> Unit,
+    onVideoClick: (Video) -> Unit,
     onLoadMore: () -> Unit,
     onRetryLoadMore: () -> Unit,
     modifier: Modifier = Modifier
@@ -140,12 +123,12 @@ private fun VideoSuccessContent(
 
     VideoListContent(
         videos = state.videos,
-        activeVideoId = activeVideoId,
+        activeVideoId = null,
         isLoadingMore = state.isLoadingMore,
         canLoadMore = state.canLoadMore,
         loadMoreErrorMessage = state.loadMoreErrorMessage,
-        onPlayClick = onPlayClick,
-        onOpenExternallyClick = onOpenExternallyClick,
+        onPlayClick = onVideoClick,
+        onOpenExternallyClick = onVideoClick,
         onLoadMore = onLoadMore,
         onRetryLoadMore = onRetryLoadMore,
         modifier = modifier
