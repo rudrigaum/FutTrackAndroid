@@ -3,7 +3,7 @@ package com.rodrigo.androidapp.futtrack.presentation.standings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.presentation.components.FutTrackTopAppBar
+import com.rodrigo.androidapp.futtrack.presentation.standings.components.SemifinalStatusCard
 import com.rodrigo.androidapp.futtrack.ui.theme.FutTrackTheme
 import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
 
@@ -41,7 +42,9 @@ fun StandingsRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    StandingsScreen(uiState = uiState)
+    StandingsScreen(
+        uiState = uiState
+    )
 }
 
 @Composable
@@ -52,7 +55,9 @@ fun StandingsScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            FutTrackTopAppBar(title = "Baba Amigos do Lelé")
+            FutTrackTopAppBar(
+                title = "Classificação"
+            )
         }
     ) { paddingValues ->
         if (uiState.isLoading) {
@@ -89,48 +94,72 @@ private fun StandingsContent(
     uiState: StandingsUiState,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier) {
-        StandingRow(
-            position = "#",
-            teamId = null,
-            teamName = "Time",
-            points = "Pts",
-            played = "J",
-            wins = "V",
-            draws = "E",
-            losses = "D",
-            goalsFor = "GP",
-            goalsAgainst = "GC",
-            goalDiff = "SG",
-            isHeader = true
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(
+            bottom = 24.dp
         )
+    ) {
+        item(
+            key = STANDINGS_HEADER_KEY
+        ) {
+            StandingRow(
+                position = "#",
+                teamId = null,
+                teamName = "Time",
+                points = "Pts",
+                played = "J",
+                wins = "V",
+                draws = "E",
+                losses = "D",
+                goalsFor = "GP",
+                goalsAgainst = "GC",
+                goalDiff = "SG",
+                isHeader = true
+            )
 
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.surfaceVariant
-        )
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
 
-        LazyColumn {
-            itemsIndexed(
-                items = uiState.standings,
-                key = { _, standing -> standing.team.id }
-            ) { index, standing ->
-                StandingRow(
-                    position = (index + 1).toString(),
-                    teamId = standing.team.id,
-                    teamName = standing.team.name,
-                    points = standing.points.toString(),
-                    played = standing.matchesPlayed.toString(),
-                    wins = standing.wins.toString(),
-                    draws = standing.draws.toString(),
-                    losses = standing.losses.toString(),
-                    goalsFor = standing.goalsFor.toString(),
-                    goalsAgainst = standing.goalsAgainst.toString(),
-                    goalDiff = standing.goalDifference.toString(),
-                    isHeader = false
-                )
+        itemsIndexed(
+            items = uiState.standings,
+            key = { _, standing ->
+                standing.team.id
+            }
+        ) { index, standing ->
+            StandingRow(
+                position = (index + 1).toString(),
+                teamId = standing.team.id,
+                teamName = standing.team.name,
+                points = standing.points.toString(),
+                played = standing.matchesPlayed.toString(),
+                wins = standing.wins.toString(),
+                draws = standing.draws.toString(),
+                losses = standing.losses.toString(),
+                goalsFor = standing.goalsFor.toString(),
+                goalsAgainst = standing.goalsAgainst.toString(),
+                goalDiff = standing.goalDifference.toString(),
+                isHeader = false
+            )
 
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.surfaceVariant
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
+
+        uiState.semifinalStatus?.let { status ->
+            item(
+                key = SEMIFINAL_STATUS_KEY
+            ) {
+                SemifinalStatusCard(
+                    status = status,
+                    modifier = Modifier.padding(
+                        start = 16.dp,
+                        top = 20.dp,
+                        end = 16.dp
+                    )
                 )
             }
         }
@@ -170,7 +199,9 @@ fun StandingRow(
             .fillMaxWidth()
             .background(
                 if (isHeader) {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    MaterialTheme.colorScheme.surfaceVariant.copy(
+                        alpha = 0.5f
+                    )
                 } else {
                     MaterialTheme.colorScheme.surface
                 }
@@ -263,16 +294,22 @@ private fun TeamCell(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier.padding(horizontal = 4.dp),
+        modifier = modifier.padding(
+            horizontal = 4.dp
+        ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (teamId != null) {
             Image(
-                painter = painterResource(id = getTeamCrest(teamId)),
+                painter = painterResource(
+                    id = getTeamCrest(teamId)
+                ),
                 contentDescription = null,
                 modifier = Modifier
                     .size(26.dp)
-                    .padding(end = 6.dp),
+                    .padding(
+                        end = 6.dp
+                    ),
                 contentScale = ContentScale.Fit
             )
         }
@@ -329,3 +366,9 @@ private fun StandingRowPreview() {
         )
     }
 }
+
+private const val STANDINGS_HEADER_KEY =
+    "standings_header"
+
+private const val SEMIFINAL_STATUS_KEY =
+    "semifinal_status"

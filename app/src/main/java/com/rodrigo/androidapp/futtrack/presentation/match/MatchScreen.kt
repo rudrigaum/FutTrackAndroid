@@ -255,7 +255,7 @@ fun MatchScreen(
                         Spacer(modifier = Modifier.width(12.dp))
 
                         Text(
-                            text = "Baba Amigos do Lelé",
+                            text = "Calendário e Resultados",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
