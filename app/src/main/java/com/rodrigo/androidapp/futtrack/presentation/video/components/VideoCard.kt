@@ -1,29 +1,41 @@
 package com.rodrigo.androidapp.futtrack.presentation.video.components
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.rodrigo.androidapp.futtrack.domain.model.Video
 import com.rodrigo.androidapp.futtrack.ui.theme.FutTrackTheme
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun VideoCard(
@@ -33,43 +45,19 @@ fun VideoCard(
     modifier: Modifier = Modifier,
     playerContent: @Composable () -> Unit = {}
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column {
-            VideoMediaContent(
-                video = video,
-                isPlaying = isPlaying,
-                onPlayClick = onPlayClick,
-                playerContent = playerContent
-            )
-
-            VideoInformation(video = video)
-        }
-    }
-}
-
-@Composable
-private fun VideoMediaContent(
-    video: Video,
-    isPlaying: Boolean,
-    onPlayClick: (Video) -> Unit,
-    playerContent: @Composable () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(200.dp),
-        contentAlignment = Alignment.Center
+            .animateContentSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (isPlaying) {
-            playerContent()
+            VideoPlayingContent(
+                video = video,
+                playerContent = playerContent
+            )
         } else {
-            VideoThumbnail(
+            VideoCatalogItem(
                 video = video,
                 onPlayClick = onPlayClick
             )
@@ -78,33 +66,52 @@ private fun VideoMediaContent(
 }
 
 @Composable
-private fun VideoThumbnail(
+private fun VideoCatalogItem(
     video: Video,
     onPlayClick: (Video) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(
+                onClickLabel = "Reproduzir ${video.title}",
+                role = Role.Button,
+                onClick = {
+                    onPlayClick(video)
+                }
+            )
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        AsyncImage(
-            model = video.thumbnailUrl,
-            contentDescription = "Thumbnail do vídeo ${video.title}",
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp),
-            contentScale = ContentScale.Crop
+        VideoThumbnail(
+            video = video
         )
 
-        FilledIconButton(
-            onClick = { onPlayClick(video) }
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Reproduzir ${video.title}"
-            )
-        }
+        VideoInformation(
+            video = video,
+            modifier = Modifier.weight(1f)
+        )
+
+        VideoPlayIndicator()
     }
+}
+
+@Composable
+private fun VideoThumbnail(
+    video: Video,
+    modifier: Modifier = Modifier
+) {
+    AsyncImage(
+        model = video.thumbnailUrl,
+        contentDescription = "Thumbnail do vídeo ${video.title}",
+        modifier = modifier
+            .width(132.dp)
+            .aspectRatio(VIDEO_ASPECT_RATIO)
+            .clip(RoundedCornerShape(10.dp)),
+        contentScale = ContentScale.Crop
+    )
 }
 
 @Composable
@@ -113,42 +120,101 @@ private fun VideoInformation(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.padding(16.dp)
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
             text = video.title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-
         Text(
-            text = video.description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                alpha = DESCRIPTION_ALPHA
-            ),
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis
+            text = video.publishedAt.toDisplayDate(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
+@Composable
+private fun VideoPlayIndicator(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.size(44.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary
+        )
+    ) {
+        Box(
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun VideoPlayingContent(
+    video: Video,
+    playerContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        playerContent()
+
+        VideoInformation(
+            video = video
+        )
+    }
+}
+
+private fun String.toDisplayDate(): String {
+    val date = runCatching {
+        OffsetDateTime
+            .parse(this)
+            .toLocalDate()
+    }.recoverCatching {
+        LocalDate.parse(this)
+    }.getOrNull()
+
+    return date
+        ?.format(DISPLAY_DATE_FORMATTER)
+        ?: this
+}
+
 @Preview(
-    name = "Video Card - Thumbnail",
+    name = "Video Card - Catalog Item",
     showBackground = true
 )
 @Composable
-private fun VideoCardThumbnailPreview() {
+private fun VideoCardCatalogPreview() {
     FutTrackTheme {
-        VideoCard(
-            video = previewVideo,
-            isPlaying = false,
-            onPlayClick = {}
-        )
+        Surface(
+            color = MaterialTheme.colorScheme.background
+        ) {
+            VideoCard(
+                video = previewVideo,
+                isPlaying = false,
+                onPlayClick = {},
+                modifier = Modifier.padding(16.dp)
+            )
+        }
     }
 }
 
@@ -159,30 +225,40 @@ private fun VideoCardThumbnailPreview() {
 @Composable
 private fun VideoCardPlayingPreview() {
     FutTrackTheme {
-        VideoCard(
-            video = previewVideo,
-            isPlaying = true,
-            onPlayClick = {},
-            playerContent = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = "Embedded video player")
+        Surface(
+            color = MaterialTheme.colorScheme.background
+        ) {
+            VideoCard(
+                video = previewVideo,
+                isPlaying = true,
+                onPlayClick = {},
+                modifier = Modifier.padding(16.dp),
+                playerContent = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(VIDEO_ASPECT_RATIO),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Embedded video player"
+                        )
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 }
 
-private const val DESCRIPTION_ALPHA = 0.8f
+private const val VIDEO_ASPECT_RATIO = 16f / 9f
+
+private val DISPLAY_DATE_FORMATTER =
+    DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
 private val previewVideo = Video(
     id = "123",
-    title = "Melhores Lances do Baba Amigos do Lelé - Junho 2026",
-    description = "Grandes defesas do goleiro Digo e os gols da rodada decisiva.",
+    title = "Campeonato BAL 18/04/2026 Parte 05",
+    description = "Grandes defesas e gols da rodada.",
     thumbnailUrl = "https://img.youtube.com/vi/dQw4w9WgXcQ/0.jpg",
-    publishedAt = "2026-06-30"
+    publishedAt = "2026-04-18T17:46:29Z"
 )

@@ -4,7 +4,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class YouTubePlaylistResponse(
-    val items: List<PlaylistItemDto>
+    val items: List<PlaylistItemDto>,
+    val nextPageToken: String? = null
 )
 
 @Serializable

@@ -3,13 +3,8 @@ package com.rodrigo.androidapp.futtrack.presentation.video
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -17,9 +12,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -27,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.domain.model.Video
 import com.rodrigo.androidapp.futtrack.presentation.components.FutTrackTopAppBar
-import com.rodrigo.androidapp.futtrack.presentation.video.components.VideoCard
+import com.rodrigo.androidapp.futtrack.presentation.video.components.VideoListContent
 import com.rodrigo.androidapp.futtrack.ui.theme.FutTrackTheme
 
 @Composable
@@ -42,6 +34,8 @@ fun VideoScreen(
         uiState = uiState,
         onVideoClick = onVideoClick,
         onRetryClick = viewModel::fetchVideos,
+        onLoadMore = viewModel::loadNextPage,
+        onRetryLoadMore = viewModel::retryLoadNextPage,
         modifier = modifier
     )
 }
@@ -51,26 +45,24 @@ fun VideoScreenContent(
     uiState: VideoUiState,
     onVideoClick: (Video) -> Unit,
     onRetryClick: () -> Unit,
+    onLoadMore: () -> Unit,
+    onRetryLoadMore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var activeVideoId by rememberSaveable {
-        mutableStateOf<String?>(null)
-    }
-
     Scaffold(
         modifier = modifier,
         topBar = {
-            FutTrackTopAppBar(title = "Vídeos do Baba")
+            FutTrackTopAppBar(
+                title = "Vídeos do Baba"
+            )
         }
     ) { paddingValues ->
         VideoScreenState(
             uiState = uiState,
-            activeVideoId = activeVideoId,
-            onPlayClick = { video ->
-                activeVideoId = video.id
-            },
-            onOpenExternallyClick = onVideoClick,
+            onVideoClick = onVideoClick,
             onRetryClick = onRetryClick,
+            onLoadMore = onLoadMore,
+            onRetryLoadMore = onRetryLoadMore,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -81,23 +73,25 @@ fun VideoScreenContent(
 @Composable
 private fun VideoScreenState(
     uiState: VideoUiState,
-    activeVideoId: String?,
-    onPlayClick: (Video) -> Unit,
-    onOpenExternallyClick: (Video) -> Unit,
+    onVideoClick: (Video) -> Unit,
     onRetryClick: () -> Unit,
+    onLoadMore: () -> Unit,
+    onRetryLoadMore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     when (uiState) {
         VideoUiState.Loading -> {
-            VideoLoadingContent(modifier = modifier)
+            VideoLoadingContent(
+                modifier = modifier
+            )
         }
 
         is VideoUiState.Success -> {
-            VideoListContent(
-                videos = uiState.videos,
-                activeVideoId = activeVideoId,
-                onPlayClick = onPlayClick,
-                onOpenExternallyClick = onOpenExternallyClick,
+            VideoSuccessContent(
+                state = uiState,
+                onVideoClick = onVideoClick,
+                onLoadMore = onLoadMore,
+                onRetryLoadMore = onRetryLoadMore,
                 modifier = modifier
             )
         }
@@ -113,6 +107,35 @@ private fun VideoScreenState(
 }
 
 @Composable
+private fun VideoSuccessContent(
+    state: VideoUiState.Success,
+    onVideoClick: (Video) -> Unit,
+    onLoadMore: () -> Unit,
+    onRetryLoadMore: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (state.videos.isEmpty()) {
+        VideoEmptyContent(
+            modifier = modifier
+        )
+        return
+    }
+
+    VideoListContent(
+        videos = state.videos,
+        activeVideoId = null,
+        isLoadingMore = state.isLoadingMore,
+        canLoadMore = state.canLoadMore,
+        loadMoreErrorMessage = state.loadMoreErrorMessage,
+        onPlayClick = onVideoClick,
+        onOpenExternallyClick = onVideoClick,
+        onLoadMore = onLoadMore,
+        onRetryLoadMore = onRetryLoadMore,
+        modifier = modifier
+    )
+}
+
+@Composable
 private fun VideoLoadingContent(
     modifier: Modifier = Modifier
 ) {
@@ -125,70 +148,18 @@ private fun VideoLoadingContent(
 }
 
 @Composable
-private fun VideoListContent(
-    videos: List<Video>,
-    activeVideoId: String?,
-    onPlayClick: (Video) -> Unit,
-    onOpenExternallyClick: (Video) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(
-            items = videos,
-            key = Video::id
-        ) { video ->
-            val isPlaying = video.id == activeVideoId
-
-            VideoCard(
-                video = video,
-                isPlaying = isPlaying,
-                onPlayClick = onPlayClick,
-                playerContent = {
-                    VideoPlayerPlaceholder(
-                        video = video,
-                        onOpenExternallyClick = onOpenExternallyClick
-                    )
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun VideoPlayerPlaceholder(
-    video: Video,
-    onOpenExternallyClick: (Video) -> Unit,
+private fun VideoEmptyContent(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(200.dp),
+        modifier = modifier.padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            CircularProgressIndicator()
-
-            Text(
-                text = "Preparando player...",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            Button(
-                onClick = {
-                    onOpenExternallyClick(video)
-                }
-            ) {
-                Text(text = "Abrir no YouTube")
-            }
-        }
+        Text(
+            text = "Nenhum vídeo disponível no momento.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -211,8 +182,12 @@ private fun VideoErrorContent(
                 style = MaterialTheme.typography.bodyLarge
             )
 
-            Button(onClick = onRetryClick) {
-                Text(text = "Tentar novamente")
+            Button(
+                onClick = onRetryClick
+            ) {
+                Text(
+                    text = "Tentar novamente"
+                )
             }
         }
     }
@@ -228,7 +203,9 @@ private fun VideoScreenLoadingPreview() {
         VideoScreenContent(
             uiState = VideoUiState.Loading,
             onVideoClick = {},
-            onRetryClick = {}
+            onRetryClick = {},
+            onLoadMore = {},
+            onRetryLoadMore = {}
         )
     }
 }
@@ -242,10 +219,33 @@ private fun VideoScreenSuccessPreview() {
     FutTrackTheme {
         VideoScreenContent(
             uiState = VideoUiState.Success(
-                videos = previewVideos
+                videos = previewVideos,
+                hasNextPage = true
             ),
             onVideoClick = {},
-            onRetryClick = {}
+            onRetryClick = {},
+            onLoadMore = {},
+            onRetryLoadMore = {}
+        )
+    }
+}
+
+@Preview(
+    name = "Videos - Empty",
+    showBackground = true
+)
+@Composable
+private fun VideoScreenEmptyPreview() {
+    FutTrackTheme {
+        VideoScreenContent(
+            uiState = VideoUiState.Success(
+                videos = emptyList(),
+                hasNextPage = false
+            ),
+            onVideoClick = {},
+            onRetryClick = {},
+            onLoadMore = {},
+            onRetryLoadMore = {}
         )
     }
 }
@@ -262,7 +262,9 @@ private fun VideoScreenErrorPreview() {
                 message = "Não foi possível carregar os vídeos."
             ),
             onVideoClick = {},
-            onRetryClick = {}
+            onRetryClick = {},
+            onLoadMore = {},
+            onRetryLoadMore = {}
         )
     }
 }
@@ -271,14 +273,14 @@ private val previewVideos = listOf(
     Video(
         id = "1",
         title = "Brasil 3 x 1 Itália - Melhores Momentos",
-        description = "Resumo completo da partida.",
+        description = "Resumo completo da partida e os principais lances da rodada.",
         thumbnailUrl = "https://img.youtube.com/vi/dQw4w9WgXcQ/0.jpg",
         publishedAt = "2026-06-30"
     ),
     Video(
         id = "2",
         title = "Defesas Incríveis do Baba",
-        description = "Goleiros fechando o gol.",
+        description = "As melhores defesas dos goleiros durante a rodada.",
         thumbnailUrl = "https://img.youtube.com/vi/dQw4w9WgXcQ/0.jpg",
         publishedAt = "2026-06-29"
     )

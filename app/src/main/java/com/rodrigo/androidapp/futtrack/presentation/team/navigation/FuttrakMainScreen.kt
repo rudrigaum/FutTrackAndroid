@@ -1,7 +1,5 @@
 package com.rodrigo.androidapp.futtrack.presentation.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -10,10 +8,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -26,12 +23,21 @@ import com.rodrigo.androidapp.futtrack.presentation.standings.StandingsRoute
 import com.rodrigo.androidapp.futtrack.presentation.team.TeamListRoute
 import com.rodrigo.androidapp.futtrack.presentation.team.TeamPlayersRoute
 import com.rodrigo.androidapp.futtrack.presentation.topscorers.TopScorersRoute
+import com.rodrigo.androidapp.futtrack.presentation.video.navigation.VideoPlayerRoute
 import com.rodrigo.androidapp.futtrack.presentation.video.navigation.VideoRoute
+import com.rodrigo.androidapp.futtrack.presentation.video.navigation.navigateToVideoPlayer
+import com.rodrigo.androidapp.futtrack.presentation.video.navigation.videoPlayerScreen
 import com.rodrigo.androidapp.futtrack.presentation.video.navigation.videoScreen
 
 @Composable
 fun FuttrakMainScreen() {
     val navController = rememberNavController()
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    val isVideoPlayerDestination =
+        currentDestination?.hasRoute<VideoPlayerRoute>() == true
 
     val items = listOf(
         BottomNavItem.Teams,
@@ -43,37 +49,62 @@ fun FuttrakMainScreen() {
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentDestination = navBackStackEntry?.destination
+            if (!isVideoPlayerDestination) {
+                NavigationBar {
+                    items.forEach { item ->
+                        val selected = if (item is BottomNavItem.Videos) {
+                            currentDestination
+                                ?.hasRoute<VideoRoute>() == true
+                        } else {
+                            currentDestination
+                                ?.hierarchy
+                                ?.any { destination ->
+                                    destination.route == item.route
+                                } == true
+                        }
 
-                items.forEach { item ->
-                    val selected = if (item is BottomNavItem.Videos) {
-                        currentDestination?.hasRoute<VideoRoute>() == true
-                    } else {
-                        currentDestination?.hierarchy?.any { it.route == item.route } == true
-                    }
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    imageVector = item.icon,
+                                    contentDescription = item.title
+                                )
+                            },
+                            label = {
+                                Text(text = item.title)
+                            },
+                            selected = selected,
+                            onClick = {
+                                if (item is BottomNavItem.Videos) {
+                                    navController.navigate(VideoRoute) {
+                                        popUpTo(
+                                            navController.graph
+                                                .findStartDestination()
+                                                .id
+                                        ) {
+                                            saveState = true
+                                        }
 
-                    NavigationBarItem(
-                        icon = { Icon(imageVector = item.icon, contentDescription = item.title) },
-                        label = { Text(text = item.title) },
-                        selected = selected,
-                        onClick = {
-                            if (item is BottomNavItem.Videos) {
-                                navController.navigate(VideoRoute) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            } else {
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                } else {
+                                    navController.navigate(item.route) {
+                                        popUpTo(
+                                            navController.graph
+                                                .findStartDestination()
+                                                .id
+                                        ) {
+                                            saveState = true
+                                        }
+
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -86,7 +117,9 @@ fun FuttrakMainScreen() {
             composable(BottomNavItem.Teams.route) {
                 TeamListRoute(
                     onNavigateToTeamPlayers = { teamId, teamName ->
-                        navController.navigate("team_players/$teamId/$teamName")
+                        navController.navigate(
+                            "team_players/$teamId/$teamName"
+                        )
                     }
                 )
             }
@@ -94,33 +127,54 @@ fun FuttrakMainScreen() {
             composable(
                 route = "team_players/{teamId}/{teamName}",
                 arguments = listOf(
-                    navArgument("teamId") { type = NavType.StringType },
-                    navArgument("teamName") { type = NavType.StringType }
+                    navArgument("teamId") {
+                        type = NavType.StringType
+                    },
+                    navArgument("teamName") {
+                        type = NavType.StringType
+                    }
                 )
             ) { backStackEntry ->
-                val teamId = backStackEntry.arguments?.getString("teamId") ?: ""
-                val teamName = backStackEntry.arguments?.getString("teamName") ?: ""
+                val teamId =
+                    backStackEntry.arguments
+                        ?.getString("teamId")
+                        .orEmpty()
+
+                val teamName =
+                    backStackEntry.arguments
+                        ?.getString("teamName")
+                        .orEmpty()
 
                 TeamPlayersRoute(
                     teamId = teamId,
                     teamName = teamName,
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
                 )
             }
 
             composable(BottomNavItem.Matches.route) {
                 MatchRoute()
             }
+
             composable(BottomNavItem.Standings.route) {
                 StandingsRoute()
             }
+
             composable(BottomNavItem.Statistics.route) {
                 TopScorersRoute()
             }
 
             videoScreen(
                 onVideoClick = { video ->
-                    println("Clicou no vídeo do YouTube: ${video.title}")
+                    navController.navigateToVideoPlayer(video)
+                }
+            )
+
+            videoPlayerScreen(
+                onBackClick = {
+                    navController.navigateUp()
                 }
             )
         }
