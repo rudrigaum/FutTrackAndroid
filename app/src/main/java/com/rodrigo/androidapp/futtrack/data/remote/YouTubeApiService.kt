@@ -10,7 +10,8 @@ interface YouTubeApiService {
     suspend fun fetchLatestVideos(
         @Query("key") apiKey: String,
         @Query("playlistId") playlistId: String,
-        @Query("part") part: String = "snippet",
-        @Query("maxResults") maxResults: Int = 15
+        @Query("part") part: String,
+        @Query("maxResults") maxResults: Int = 20,
+        @Query("pageToken") pageToken: String? = null
     ): YouTubePlaylistResponse
 }
