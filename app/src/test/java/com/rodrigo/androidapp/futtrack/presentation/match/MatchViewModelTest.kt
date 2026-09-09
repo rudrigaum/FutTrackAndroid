@@ -23,16 +23,19 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
+import java.time.YearMonth
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MatchViewModelTest {
 
     private val testScheduler = TestCoroutineScheduler()
-    private val testDispatcher = StandardTestDispatcher(testScheduler)
+    private val testDispatcher =
+        StandardTestDispatcher(testScheduler)
 
     private lateinit var matchRepository: FakeMatchRepository
     private lateinit var teamRepository: FakeTeamRepository
@@ -168,6 +171,262 @@ class MatchViewModelTest {
                     oldestDate
                 ),
                 groupedDates
+            )
+        }
+
+    @Test
+    fun `should select latest available month by default`() =
+        runTest(testDispatcher) {
+            matchRepository.setMatches(
+                createMatchesAcrossMonths()
+            )
+
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+
+            assertEquals(
+                SEPTEMBER_2026,
+                state.selectedMonth
+            )
+
+            assertTrue(
+                state.canSelectOlderMonth
+            )
+
+            assertFalse(
+                state.canSelectNewerMonth
+            )
+        }
+
+    @Test
+    fun `should expose only matches from selected month`() =
+        runTest(testDispatcher) {
+            matchRepository.setMatches(
+                createMatchesAcrossMonths()
+            )
+
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+
+            assertEquals(
+                SEPTEMBER_2026,
+                state.selectedMonth
+            )
+
+            assertEquals(
+                listOf(SEPTEMBER_DATE),
+                state.filteredGroupedMatches.keys.toList()
+            )
+
+            assertEquals(
+                "september-match",
+                state.filteredGroupedMatches
+                    .values
+                    .flatten()
+                    .single()
+                    .id
+            )
+        }
+
+    @Test
+    fun `should select older available month`() =
+        runTest(testDispatcher) {
+            matchRepository.setMatches(
+                createMatchesAcrossMonths()
+            )
+
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.selectOlderMonth()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+
+            assertEquals(
+                AUGUST_2026,
+                state.selectedMonth
+            )
+
+            assertTrue(
+                state.canSelectOlderMonth
+            )
+
+            assertTrue(
+                state.canSelectNewerMonth
+            )
+
+            assertEquals(
+                listOf(AUGUST_DATE),
+                state.filteredGroupedMatches.keys.toList()
+            )
+        }
+
+    @Test
+    fun `should select newer available month`() =
+        runTest(testDispatcher) {
+            matchRepository.setMatches(
+                createMatchesAcrossMonths()
+            )
+
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.selectOlderMonth()
+            advanceUntilIdle()
+
+            viewModel.selectNewerMonth()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+
+            assertEquals(
+                SEPTEMBER_2026,
+                state.selectedMonth
+            )
+
+            assertTrue(
+                state.canSelectOlderMonth
+            )
+
+            assertFalse(
+                state.canSelectNewerMonth
+            )
+        }
+
+    @Test
+    fun `should not navigate before oldest available month`() =
+        runTest(testDispatcher) {
+            matchRepository.setMatches(
+                createMatchesAcrossMonths()
+            )
+
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.selectOlderMonth()
+            advanceUntilIdle()
+
+            viewModel.selectOlderMonth()
+            advanceUntilIdle()
+
+            viewModel.selectOlderMonth()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+
+            assertEquals(
+                JULY_2026,
+                state.selectedMonth
+            )
+
+            assertFalse(
+                state.canSelectOlderMonth
+            )
+
+            assertTrue(
+                state.canSelectNewerMonth
+            )
+        }
+
+    @Test
+    fun `should not navigate after newest available month`() =
+        runTest(testDispatcher) {
+            matchRepository.setMatches(
+                createMatchesAcrossMonths()
+            )
+
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.selectNewerMonth()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+
+            assertEquals(
+                SEPTEMBER_2026,
+                state.selectedMonth
+            )
+
+            assertFalse(
+                state.canSelectNewerMonth
+            )
+        }
+
+    @Test
+    fun `should keep all matches while exposing filtered matches`() =
+        runTest(testDispatcher) {
+            matchRepository.setMatches(
+                createMatchesAcrossMonths()
+            )
+
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.selectOlderMonth()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+
+            assertEquals(
+                3,
+                state.groupedMatches.size
+            )
+
+            assertEquals(
+                1,
+                state.filteredGroupedMatches.size
+            )
+
+            assertEquals(
+                AUGUST_2026,
+                state.selectedMonth
+            )
+        }
+
+    @Test
+    fun `should expose no selected month when there are no matches`() =
+        runTest(testDispatcher) {
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+
+            assertNull(
+                state.selectedMonth
+            )
+
+            assertTrue(
+                state.filteredGroupedMatches.isEmpty()
+            )
+
+            assertFalse(
+                state.canSelectOlderMonth
+            )
+
+            assertFalse(
+                state.canSelectNewerMonth
             )
         }
 
@@ -387,6 +646,26 @@ class MatchViewModelTest {
         )
     }
 
+    private fun createMatchesAcrossMonths(): List<Match> {
+        return listOf(
+            createMatch(
+                id = "september-match",
+                slot = MatchSlot.GAME_1,
+                date = SEPTEMBER_DATE
+            ),
+            createMatch(
+                id = "august-match",
+                slot = MatchSlot.GAME_1,
+                date = AUGUST_DATE
+            ),
+            createMatch(
+                id = "july-match",
+                slot = MatchSlot.GAME_1,
+                date = JULY_DATE
+            )
+        )
+    }
+
     private class FakeMatchRepository(
         initialMatches: List<Match> = emptyList()
     ) : MatchRepository {
@@ -464,6 +743,24 @@ class MatchViewModelTest {
 
         val TEST_DATE: LocalDate =
             LocalDate.of(2026, 8, 15)
+
+        val JULY_DATE: LocalDate =
+            LocalDate.of(2026, 7, 4)
+
+        val AUGUST_DATE: LocalDate =
+            LocalDate.of(2026, 8, 15)
+
+        val SEPTEMBER_DATE: LocalDate =
+            LocalDate.of(2026, 9, 5)
+
+        val JULY_2026: YearMonth =
+            YearMonth.of(2026, 7)
+
+        val AUGUST_2026: YearMonth =
+            YearMonth.of(2026, 8)
+
+        val SEPTEMBER_2026: YearMonth =
+            YearMonth.of(2026, 9)
 
         val HOME_TEAM = Team(
             id = "team_brasil",
