@@ -18,12 +18,12 @@ class MatchSlotTest {
     @Test
     fun `should map each match number to its official start time`() {
         val expectedSlots = mapOf(
-            1 to LocalTime.of(8, 0),
-            2 to LocalTime.of(8, 13),
-            3 to LocalTime.of(8, 26),
-            4 to LocalTime.of(8, 39),
-            5 to LocalTime.of(8, 52),
-            6 to LocalTime.of(9, 7)
+            1 to LocalTime.of(8, 30),
+            2 to LocalTime.of(8, 43),
+            3 to LocalTime.of(8, 56),
+            4 to LocalTime.of(9, 9),
+            5 to LocalTime.of(9, 22),
+            6 to LocalTime.of(9, 37)
         )
 
         expectedSlots.forEach { (matchNumber, expectedStartTime) ->
