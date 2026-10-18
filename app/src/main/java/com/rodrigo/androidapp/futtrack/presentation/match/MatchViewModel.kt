@@ -6,6 +6,8 @@ import com.rodrigo.androidapp.futtrack.domain.model.Match
 import com.rodrigo.androidapp.futtrack.domain.model.MatchSlot
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.Team
+import com.rodrigo.androidapp.futtrack.domain.model.MatchLeg
+import com.rodrigo.androidapp.futtrack.domain.model.MatchStage
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
 import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -105,11 +107,14 @@ class MatchViewModel @Inject constructor(
         }
     }
 
+
     fun scheduleNewMatch(
         homeTeamId: String,
         awayTeamId: String,
         date: LocalDate,
-        slot: MatchSlot
+        slot: MatchSlot,
+        stage: MatchStage = MatchStage.REGULAR,
+        leg: MatchLeg? = null
     ) {
         if (homeTeamId == awayTeamId) {
             return
@@ -119,17 +124,35 @@ class MatchViewModel @Inject constructor(
             return
         }
 
+        when (stage) {
+            MatchStage.REGULAR -> {
+                if (leg != null) {
+                    return
+                }
+            }
+
+            MatchStage.SEMIFINAL,
+            MatchStage.FINAL -> {
+                if (leg == null) {
+                    return
+                }
+            }
+        }
+
         val match = Match(
             matchNumber = slot.matchNumber,
             homeTeamId = homeTeamId,
             awayTeamId = awayTeamId,
-            date = date.atTime(slot.startTime)
+            date = date.atTime(slot.startTime),
+            stage = stage,
+            leg = leg
         )
 
         viewModelScope.launch {
             matchRepository.scheduleMatch(match)
         }
     }
+
 
     fun deleteMatch(matchId: String) {
         viewModelScope.launch {
