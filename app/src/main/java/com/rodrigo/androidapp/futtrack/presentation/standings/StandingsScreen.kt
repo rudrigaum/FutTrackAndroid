@@ -1,3 +1,4 @@
+
 package com.rodrigo.androidapp.futtrack.presentation.standings
 
 import androidx.compose.foundation.Image
@@ -32,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.presentation.components.FutTrackTopAppBar
-import com.rodrigo.androidapp.futtrack.presentation.standings.components.SemifinalStatusCard
+import com.rodrigo.androidapp.futtrack.presentation.standings.components.KnockoutBracketCard
 import com.rodrigo.androidapp.futtrack.ui.theme.FutTrackTheme
 import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
 
@@ -94,6 +95,12 @@ private fun StandingsContent(
     uiState: StandingsUiState,
     modifier: Modifier = Modifier
 ) {
+    val firstPlaceTeam = uiState.standings
+        .firstOrNull()
+        ?.team
+
+    val semifinalStatus = uiState.semifinalStatus
+
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(
@@ -149,12 +156,13 @@ private fun StandingsContent(
             )
         }
 
-        uiState.semifinalStatus?.let { status ->
+        if (firstPlaceTeam != null && semifinalStatus != null) {
             item(
-                key = SEMIFINAL_STATUS_KEY
+                key = KNOCKOUT_BRACKET_KEY
             ) {
-                SemifinalStatusCard(
-                    status = status,
+                KnockoutBracketCard(
+                    firstPlaceTeam = firstPlaceTeam,
+                    status = semifinalStatus,
                     modifier = Modifier.padding(
                         start = 16.dp,
                         top = 20.dp,
@@ -370,5 +378,5 @@ private fun StandingRowPreview() {
 private const val STANDINGS_HEADER_KEY =
     "standings_header"
 
-private const val SEMIFINAL_STATUS_KEY =
-    "semifinal_status"
+private const val KNOCKOUT_BRACKET_KEY =
+    "knockout_bracket"
