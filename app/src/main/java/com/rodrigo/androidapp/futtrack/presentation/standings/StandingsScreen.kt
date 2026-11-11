@@ -4,6 +4,7 @@ package com.rodrigo.androidapp.futtrack.presentation.standings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -174,6 +175,7 @@ private fun StandingsContent(
     }
 }
 
+
 @Composable
 fun StandingRow(
     position: String,
@@ -196,100 +198,112 @@ fun StandingRow(
         MaterialTheme.typography.bodyMedium
     }
 
+    val statisticTextStyle = if (isHeader) {
+        MaterialTheme.typography.labelSmall
+    } else {
+        MaterialTheme.typography.bodySmall
+    }
+
     val fontWeight = if (isHeader) {
         FontWeight.Bold
     } else {
         FontWeight.Normal
     }
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                if (isHeader) {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(
-                        alpha = 0.5f
-                    )
-                } else {
-                    MaterialTheme.colorScheme.surface
-                }
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        // Keep the team and points columns close without shifting other columns.
+        val teamColumnWidth = (maxWidth - FIXED_COLUMNS_WIDTH)
+            .coerceIn(0.dp, MAX_TEAM_COLUMN_WIDTH)
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    if (isHeader) {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(
+                            alpha = 0.5f
+                        )
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    }
+                )
+                .padding(
+                    horizontal = ROW_HORIZONTAL_PADDING,
+                    vertical = 12.dp
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StatisticCell(
+                text = position,
+                width = POSITION_COLUMN_WIDTH,
+                style = statisticTextStyle,
+                fontWeight = fontWeight
             )
-            .padding(
-                horizontal = 4.dp,
-                vertical = 12.dp
-            ),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        StatisticCell(
-            text = position,
-            width = 18.dp,
-            style = textStyle,
-            fontWeight = fontWeight
-        )
 
-        TeamCell(
-            teamId = teamId,
-            teamName = teamName,
-            isHeader = isHeader,
-            textStyle = textStyle,
-            modifier = Modifier.weight(1f)
-        )
+            TeamCell(
+                teamId = teamId,
+                teamName = teamName,
+                isHeader = isHeader,
+                textStyle = textStyle,
+                modifier = Modifier.width(teamColumnWidth)
+            )
 
-        StatisticCell(
-            text = points,
-            width = 28.dp,
-            style = textStyle,
-            fontWeight = FontWeight.Bold
-        )
+            StatisticCell(
+                text = points,
+                width = POINTS_COLUMN_WIDTH,
+                style = statisticTextStyle,
+                fontWeight = FontWeight.Bold
+            )
 
-        StatisticCell(
-            text = played,
-            width = 20.dp,
-            style = textStyle,
-            fontWeight = fontWeight
-        )
+            StatisticCell(
+                text = played,
+                width = RESULTS_COLUMN_WIDTH,
+                style = statisticTextStyle,
+                fontWeight = fontWeight
+            )
 
-        StatisticCell(
-            text = wins,
-            width = 20.dp,
-            style = textStyle,
-            fontWeight = fontWeight
-        )
+            StatisticCell(
+                text = wins,
+                width = RESULTS_COLUMN_WIDTH,
+                style = statisticTextStyle,
+                fontWeight = fontWeight
+            )
 
-        StatisticCell(
-            text = draws,
-            width = 20.dp,
-            style = textStyle,
-            fontWeight = fontWeight
-        )
+            StatisticCell(
+                text = draws,
+                width = RESULTS_COLUMN_WIDTH,
+                style = statisticTextStyle,
+                fontWeight = fontWeight
+            )
 
-        StatisticCell(
-            text = losses,
-            width = 20.dp,
-            style = textStyle,
-            fontWeight = fontWeight
-        )
+            StatisticCell(
+                text = losses,
+                width = RESULTS_COLUMN_WIDTH,
+                style = statisticTextStyle,
+                fontWeight = fontWeight
+            )
 
-        StatisticCell(
-            text = goalsFor,
-            width = 22.dp,
-            style = textStyle,
-            fontWeight = fontWeight
-        )
+            StatisticCell(
+                text = goalsFor,
+                width = GOALS_COLUMN_WIDTH,
+                style = statisticTextStyle,
+                fontWeight = fontWeight
+            )
 
-        StatisticCell(
-            text = goalsAgainst,
-            width = 22.dp,
-            style = textStyle,
-            fontWeight = fontWeight
-        )
+            StatisticCell(
+                text = goalsAgainst,
+                width = GOALS_COLUMN_WIDTH,
+                style = statisticTextStyle,
+                fontWeight = fontWeight
+            )
 
-        StatisticCell(
-            text = goalDiff,
-            width = 28.dp,
-            style = textStyle,
-            fontWeight = fontWeight
-        )
+            StatisticCell(
+                text = goalDiff,
+                width = GOAL_DIFFERENCE_COLUMN_WIDTH,
+                style = statisticTextStyle,
+                fontWeight = fontWeight
+            )
+        }
     }
 }
 
@@ -351,7 +365,7 @@ private fun StatisticCell(
 }
 
 @Preview(
-    name = "Standing Row",
+    name = "Standing Row - Three Digits",
     showBackground = true,
     widthDp = 390
 )
@@ -360,23 +374,65 @@ private fun StandingRowPreview() {
     FutTrackTheme {
         StandingRow(
             position = "1",
-            teamId = null,
+            teamId = "team_brasil",
             teamName = "Brasil",
-            points = "99",
-            played = "60",
-            wins = "29",
-            draws = "12",
-            losses = "19",
-            goalsFor = "58",
-            goalsAgainst = "44",
-            goalDiff = "14",
+            points = "184",
+            played = "108",
+            wins = "54",
+            draws = "22",
+            losses = "32",
+            goalsFor = "112",
+            goalsAgainst = "84",
+            goalDiff = "42",
             isHeader = false
         )
     }
 }
+
+@Preview(
+    name = "Standing Row - Compact Width",
+    showBackground = true,
+    widthDp = 320
+)
+@Composable
+private fun StandingRowCompactPreview() {
+    FutTrackTheme {
+        StandingRow(
+            position = "3",
+            teamId = "team_alemanha",
+            teamName = "Alemanha",
+            points = "122",
+            played = "108",
+            wins = "35",
+            draws = "17",
+            losses = "56",
+            goalsFor = "91",
+            goalsAgainst = "134",
+            goalDiff = "-43",
+            isHeader = false
+        )
+    }
+}
+
+private val ROW_HORIZONTAL_PADDING = 4.dp
+private val MAX_TEAM_COLUMN_WIDTH = 112.dp
+private val POSITION_COLUMN_WIDTH = 18.dp
+private val POINTS_COLUMN_WIDTH = 30.dp
+private val RESULTS_COLUMN_WIDTH = 26.dp
+private val GOALS_COLUMN_WIDTH = 29.dp
+private val GOAL_DIFFERENCE_COLUMN_WIDTH = 34.dp
+
+private val FIXED_COLUMNS_WIDTH =
+    ROW_HORIZONTAL_PADDING * 2 +
+            POSITION_COLUMN_WIDTH +
+            POINTS_COLUMN_WIDTH +
+            RESULTS_COLUMN_WIDTH * 4 +
+            GOALS_COLUMN_WIDTH * 2 +
+            GOAL_DIFFERENCE_COLUMN_WIDTH
 
 private const val STANDINGS_HEADER_KEY =
     "standings_header"
 
 private const val KNOCKOUT_BRACKET_KEY =
     "knockout_bracket"
+
