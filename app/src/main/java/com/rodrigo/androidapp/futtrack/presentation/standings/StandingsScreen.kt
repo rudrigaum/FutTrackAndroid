@@ -1,4 +1,3 @@
-
 package com.rodrigo.androidapp.futtrack.presentation.standings
 
 import androidx.compose.foundation.Image
@@ -7,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -192,146 +192,108 @@ fun StandingRow(
     isHeader: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val textStyle = if (isHeader) {
+    val teamTextStyle = if (isHeader) {
         MaterialTheme.typography.labelMedium
     } else {
         MaterialTheme.typography.bodyMedium
     }
 
-    val statisticTextStyle = if (isHeader) {
-        MaterialTheme.typography.labelSmall
-    } else {
-        MaterialTheme.typography.bodySmall
-    }
-
-    val fontWeight = if (isHeader) {
+    val defaultFontWeight = if (isHeader) {
         FontWeight.Bold
     } else {
         FontWeight.Normal
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        // Keep the team and points columns close without shifting other columns.
-        val teamColumnWidth = (maxWidth - FIXED_COLUMNS_WIDTH)
-            .coerceIn(0.dp, MAX_TEAM_COLUMN_WIDTH)
+        val isCompact = maxWidth < 360.dp
+        val teamWidth = if (isCompact) 102.dp else 108.dp
+        val statisticTextStyle = if (isCompact) {
+            MaterialTheme.typography.labelSmall
+        } else {
+            MaterialTheme.typography.bodySmall
+        }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
                     if (isHeader) {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(
-                            alpha = 0.5f
-                        )
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     } else {
                         MaterialTheme.colorScheme.surface
                     }
                 )
-                .padding(
-                    horizontal = ROW_HORIZONTAL_PADDING,
-                    vertical = 12.dp
-                ),
+                .padding(horizontal = 4.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StatisticCell(
+            PositionCell(
                 text = position,
-                width = POSITION_COLUMN_WIDTH,
                 style = statisticTextStyle,
-                fontWeight = fontWeight
+                fontWeight = defaultFontWeight
             )
+
+            Spacer(modifier = Modifier.width(2.dp))
 
             TeamCell(
                 teamId = teamId,
                 teamName = teamName,
-                isHeader = isHeader,
-                textStyle = textStyle,
-                modifier = Modifier.width(teamColumnWidth)
+                textStyle = teamTextStyle,
+                modifier = Modifier.width(teamWidth)
             )
 
-            StatisticCell(
-                text = points,
-                width = POINTS_COLUMN_WIDTH,
-                style = statisticTextStyle,
-                fontWeight = FontWeight.Bold
-            )
+            Spacer(modifier = Modifier.width(2.dp))
 
-            StatisticCell(
-                text = played,
-                width = RESULTS_COLUMN_WIDTH,
-                style = statisticTextStyle,
-                fontWeight = fontWeight
-            )
-
-            StatisticCell(
-                text = wins,
-                width = RESULTS_COLUMN_WIDTH,
-                style = statisticTextStyle,
-                fontWeight = fontWeight
-            )
-
-            StatisticCell(
-                text = draws,
-                width = RESULTS_COLUMN_WIDTH,
-                style = statisticTextStyle,
-                fontWeight = fontWeight
-            )
-
-            StatisticCell(
-                text = losses,
-                width = RESULTS_COLUMN_WIDTH,
-                style = statisticTextStyle,
-                fontWeight = fontWeight
-            )
-
-            StatisticCell(
-                text = goalsFor,
-                width = GOALS_COLUMN_WIDTH,
-                style = statisticTextStyle,
-                fontWeight = fontWeight
-            )
-
-            StatisticCell(
-                text = goalsAgainst,
-                width = GOALS_COLUMN_WIDTH,
-                style = statisticTextStyle,
-                fontWeight = fontWeight
-            )
-
-            StatisticCell(
-                text = goalDiff,
-                width = GOAL_DIFFERENCE_COLUMN_WIDTH,
-                style = statisticTextStyle,
-                fontWeight = fontWeight
+            StatisticsRow(
+                points = points,
+                played = played,
+                wins = wins,
+                draws = draws,
+                losses = losses,
+                goalsFor = goalsFor,
+                goalsAgainst = goalsAgainst,
+                goalDiff = goalDiff,
+                textStyle = statisticTextStyle,
+                defaultFontWeight = defaultFontWeight,
+                modifier = Modifier.weight(1f)
             )
         }
     }
 }
 
 @Composable
+private fun PositionCell(
+    text: String,
+    style: TextStyle,
+    fontWeight: FontWeight
+) {
+    Text(
+        text = text,
+        modifier = Modifier.width(16.dp),
+        style = style,
+        fontWeight = fontWeight,
+        textAlign = TextAlign.Center,
+        maxLines = 1
+    )
+}
+
+@Composable
 private fun TeamCell(
     teamId: String?,
     teamName: String,
-    isHeader: Boolean,
     textStyle: TextStyle,
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier.padding(
-            horizontal = 4.dp
-        ),
+        modifier = modifier.padding(horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (teamId != null) {
             Image(
-                painter = painterResource(
-                    id = getTeamCrest(teamId)
-                ),
+                painter = painterResource(id = getTeamCrest(teamId)),
                 contentDescription = null,
                 modifier = Modifier
                     .size(26.dp)
-                    .padding(
-                        end = 6.dp
-                    ),
+                    .padding(end = 6.dp),
                 contentScale = ContentScale.Fit
             )
         }
@@ -347,20 +309,55 @@ private fun TeamCell(
 }
 
 @Composable
+private fun StatisticsRow(
+    points: String,
+    played: String,
+    wins: String,
+    draws: String,
+    losses: String,
+    goalsFor: String,
+    goalsAgainst: String,
+    goalDiff: String,
+    textStyle: TextStyle,
+    defaultFontWeight: FontWeight,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        StatisticCell(points, textStyle, FontWeight.Bold, Modifier.weight(1f))
+        StatisticCell(played, textStyle, defaultFontWeight, Modifier.weight(1f))
+        StatisticCell(wins, textStyle, defaultFontWeight, Modifier.weight(1f))
+        StatisticCell(draws, textStyle, defaultFontWeight, Modifier.weight(1f))
+        StatisticCell(losses, textStyle, defaultFontWeight, Modifier.weight(1f))
+        StatisticCell(goalsFor, textStyle, defaultFontWeight, Modifier.weight(1f))
+        StatisticCell(goalsAgainst, textStyle, defaultFontWeight, Modifier.weight(1f))
+        StatisticCell(
+            text = goalDiff,
+            style = textStyle,
+            fontWeight = defaultFontWeight,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
 private fun StatisticCell(
     text: String,
-    width: androidx.compose.ui.unit.Dp,
     style: TextStyle,
     fontWeight: FontWeight,
     modifier: Modifier = Modifier
 ) {
     Text(
         text = text,
-        modifier = modifier.width(width),
+        modifier = modifier,
         style = style,
         fontWeight = fontWeight,
         textAlign = TextAlign.Center,
-        maxLines = 1
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip
     )
 }
 
@@ -414,25 +411,8 @@ private fun StandingRowCompactPreview() {
     }
 }
 
-private val ROW_HORIZONTAL_PADDING = 4.dp
-private val MAX_TEAM_COLUMN_WIDTH = 112.dp
-private val POSITION_COLUMN_WIDTH = 18.dp
-private val POINTS_COLUMN_WIDTH = 30.dp
-private val RESULTS_COLUMN_WIDTH = 26.dp
-private val GOALS_COLUMN_WIDTH = 29.dp
-private val GOAL_DIFFERENCE_COLUMN_WIDTH = 34.dp
-
-private val FIXED_COLUMNS_WIDTH =
-    ROW_HORIZONTAL_PADDING * 2 +
-            POSITION_COLUMN_WIDTH +
-            POINTS_COLUMN_WIDTH +
-            RESULTS_COLUMN_WIDTH * 4 +
-            GOALS_COLUMN_WIDTH * 2 +
-            GOAL_DIFFERENCE_COLUMN_WIDTH
-
 private const val STANDINGS_HEADER_KEY =
     "standings_header"
 
 private const val KNOCKOUT_BRACKET_KEY =
     "knockout_bracket"
-
