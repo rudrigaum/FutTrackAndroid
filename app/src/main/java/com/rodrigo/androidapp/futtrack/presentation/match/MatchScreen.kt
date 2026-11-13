@@ -33,6 +33,8 @@ import com.rodrigo.androidapp.futtrack.R
 import com.rodrigo.androidapp.futtrack.domain.model.Match
 import com.rodrigo.androidapp.futtrack.domain.model.MatchSlot
 import com.rodrigo.androidapp.futtrack.domain.model.Team
+import com.rodrigo.androidapp.futtrack.domain.model.MatchLeg
+import com.rodrigo.androidapp.futtrack.domain.model.MatchStage
 import com.rodrigo.androidapp.futtrack.presentation.auth.AuthViewModel
 import com.rodrigo.androidapp.futtrack.presentation.match.components.MatchListSection
 import com.rodrigo.androidapp.futtrack.presentation.match.components.ScheduleMatchCard
@@ -61,6 +63,16 @@ fun MatchRoute(
                 slot = slot
             )
         },
+        onScheduleKnockoutMatch = { home, away, date, slot, stage, leg ->
+            viewModel.scheduleNewMatch(
+                homeTeamId = home.id,
+                awayTeamId = away.id,
+                date = date,
+                slot = slot,
+                stage = stage,
+                leg = leg
+            )
+        },
         onDeleteMatch = viewModel::deleteMatch,
         onFinishMatch = viewModel::finishMatch,
         onOlderMonthClick = viewModel::selectOlderMonth,
@@ -74,6 +86,14 @@ fun MatchScreen(
     isAdminMode: Boolean,
     getAvailableMatchSlots: (LocalDate) -> List<MatchSlot>,
     onScheduleMatch: (Team, Team, LocalDate, MatchSlot) -> Unit,
+    onScheduleKnockoutMatch: (
+        Team,
+        Team,
+        LocalDate,
+        MatchSlot,
+        MatchStage,
+        MatchLeg
+    ) -> Unit,
     onDeleteMatch: (String) -> Unit,
     onFinishMatch: (String, Int, Int) -> Unit,
     onOlderMonthClick: () -> Unit,
@@ -100,6 +120,7 @@ fun MatchScreen(
                 isAdminMode = isAdminMode,
                 getAvailableMatchSlots = getAvailableMatchSlots,
                 onScheduleMatch = onScheduleMatch,
+                onScheduleKnockoutMatch = onScheduleKnockoutMatch,
                 onDeleteMatch = onDeleteMatch,
                 onScoreClick = { match ->
                     matchToScore = match
@@ -133,13 +154,20 @@ fun MatchScreen(
         )
     }
 }
-
 @Composable
 private fun MatchContent(
     uiState: MatchUiState,
     isAdminMode: Boolean,
     getAvailableMatchSlots: (LocalDate) -> List<MatchSlot>,
     onScheduleMatch: (Team, Team, LocalDate, MatchSlot) -> Unit,
+    onScheduleKnockoutMatch: (
+        Team,
+        Team,
+        LocalDate,
+        MatchSlot,
+        MatchStage,
+        MatchLeg
+    ) -> Unit,
     onDeleteMatch: (String) -> Unit,
     onScoreClick: (Match) -> Unit,
     onOlderMonthClick: () -> Unit,
@@ -163,7 +191,8 @@ private fun MatchContent(
                 ScheduleMatchCard(
                     availableTeams = uiState.availableTeams,
                     getAvailableMatchSlots = getAvailableMatchSlots,
-                    onScheduleMatch = onScheduleMatch
+                    onScheduleMatch = onScheduleMatch,
+                    onScheduleKnockoutMatch = onScheduleKnockoutMatch
                 )
             }
         } else {
@@ -272,6 +301,7 @@ private fun MatchScreenPreview() {
                 MatchSlot.entries
             },
             onScheduleMatch = { _, _, _, _ -> },
+            onScheduleKnockoutMatch = { _, _, _, _, _, _ -> },
             onDeleteMatch = {},
             onFinishMatch = { _, _, _ -> },
             onOlderMonthClick = {},

@@ -1,11 +1,15 @@
 package com.rodrigo.androidapp.futtrack.presentation.match
 
 import com.rodrigo.androidapp.futtrack.domain.model.Match
+import com.rodrigo.androidapp.futtrack.domain.model.MatchLeg
 import com.rodrigo.androidapp.futtrack.domain.model.MatchSlot
+import com.rodrigo.androidapp.futtrack.domain.model.MatchStage
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.Team
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
 import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
+import com.rodrigo.androidapp.futtrack.domain.usecase.ScheduleKnockoutMatchUseCase
+import com.rodrigo.androidapp.futtrack.domain.usecase.ValidateKnockoutSchedulingUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -530,6 +534,118 @@ class MatchViewModelTest {
         }
 
     @Test
+    fun `should schedule first semifinal leg with correct stage and leg`() =
+        runTest(testDispatcher) {
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.scheduleNewMatch(
+                homeTeamId = HOME_TEAM.id,
+                awayTeamId = AWAY_TEAM.id,
+                date = TEST_DATE,
+                slot = MatchSlot.GAME_1,
+                stage = MatchStage.SEMIFINAL,
+                leg = MatchLeg.FIRST
+            )
+
+            advanceUntilIdle()
+
+            val scheduledMatch = matchRepository.scheduledMatches.single()
+
+            assertEquals(MatchStage.SEMIFINAL, scheduledMatch.stage)
+            assertEquals(MatchLeg.FIRST, scheduledMatch.leg)
+            assertEquals(HOME_TEAM.id, scheduledMatch.homeTeamId)
+            assertEquals(AWAY_TEAM.id, scheduledMatch.awayTeamId)
+            assertEquals(MatchSlot.GAME_1.matchNumber, scheduledMatch.matchNumber)
+        }
+
+    @Test
+    fun `should reject semifinal second leg when first leg does not exist`() =
+        runTest(testDispatcher) {
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.scheduleNewMatch(
+                homeTeamId = AWAY_TEAM.id,
+                awayTeamId = HOME_TEAM.id,
+                date = TEST_DATE,
+                slot = MatchSlot.GAME_2,
+                stage = MatchStage.SEMIFINAL,
+                leg = MatchLeg.SECOND
+            )
+
+            advanceUntilIdle()
+
+            assertTrue(matchRepository.scheduledMatches.isEmpty())
+        }
+
+    @Test
+    fun `should reject duplicate semifinal first leg on a different date`() =
+        runTest(testDispatcher) {
+            val existingFirstLeg = createMatch(
+                id = "semifinal-first-leg",
+                slot = MatchSlot.GAME_1
+            ).copy(
+                stage = MatchStage.SEMIFINAL,
+                leg = MatchLeg.FIRST
+            )
+
+            matchRepository.setMatches(listOf(existingFirstLeg))
+
+            val viewModel = createViewModel()
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.scheduleNewMatch(
+                homeTeamId = HOME_TEAM.id,
+                awayTeamId = AWAY_TEAM.id,
+                date = TEST_DATE.plusDays(7),
+                slot = MatchSlot.GAME_2,
+                stage = MatchStage.SEMIFINAL,
+                leg = MatchLeg.FIRST
+            )
+
+            advanceUntilIdle()
+
+            assertTrue(matchRepository.scheduledMatches.isEmpty())
+        }
+
+    @Test
+    fun `should reject semifinal second leg without reversed home teams`() =
+        runTest(testDispatcher) {
+            val existingFirstLeg = createMatch(
+                id = "semifinal-first-leg",
+                slot = MatchSlot.GAME_1
+            ).copy(
+                stage = MatchStage.SEMIFINAL,
+                leg = MatchLeg.FIRST
+            )
+
+            matchRepository.setMatches(listOf(existingFirstLeg))
+
+            val viewModel = createViewModel()
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.scheduleNewMatch(
+                homeTeamId = HOME_TEAM.id,
+                awayTeamId = AWAY_TEAM.id,
+                date = TEST_DATE.plusDays(7),
+                slot = MatchSlot.GAME_2,
+                stage = MatchStage.SEMIFINAL,
+                leg = MatchLeg.SECOND
+            )
+
+            advanceUntilIdle()
+
+            assertTrue(matchRepository.scheduledMatches.isEmpty())
+        }
+
+    @Test
     fun `should make slot available again after match is deleted`() =
         runTest(testDispatcher) {
             val existingMatch = createMatch(
@@ -615,12 +731,26 @@ class MatchViewModelTest {
             )
         }
 
+
     private fun createViewModel(): MatchViewModel {
+        val validateKnockoutSchedulingUseCase =
+            ValidateKnockoutSchedulingUseCase()
+
+        val scheduleKnockoutMatchUseCase =
+            ScheduleKnockoutMatchUseCase(
+                matchRepository = matchRepository,
+                validateKnockoutSchedulingUseCase =
+                    validateKnockoutSchedulingUseCase
+            )
+
         return MatchViewModel(
             teamRepository = teamRepository,
-            matchRepository = matchRepository
+            matchRepository = matchRepository,
+            scheduleKnockoutMatchUseCase =
+                scheduleKnockoutMatchUseCase
         )
     }
+
 
     private fun kotlinx.coroutines.test.TestScope.collectUiState(
         viewModel: MatchViewModel

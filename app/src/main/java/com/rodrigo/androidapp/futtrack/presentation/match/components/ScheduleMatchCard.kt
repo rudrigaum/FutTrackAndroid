@@ -35,6 +35,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.rodrigo.androidapp.futtrack.domain.model.MatchSlot
 import com.rodrigo.androidapp.futtrack.domain.model.Team
+import com.rodrigo.androidapp.futtrack.domain.model.MatchLeg
+import com.rodrigo.androidapp.futtrack.domain.model.MatchStage
 import com.rodrigo.androidapp.futtrack.ui.theme.FutTrackTheme
 import java.time.Instant
 import java.time.LocalDate
@@ -47,8 +49,19 @@ fun ScheduleMatchCard(
     availableTeams: List<Team>,
     getAvailableMatchSlots: (LocalDate) -> List<MatchSlot>,
     onScheduleMatch: (Team, Team, LocalDate, MatchSlot) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onScheduleKnockoutMatch: (
+        (Team, Team, LocalDate, MatchSlot, MatchStage, MatchLeg) -> Unit
+    )? = null
 ) {
+    var selectedStage by rememberSaveable {
+        mutableStateOf(MatchStage.REGULAR)
+    }
+
+    var selectedLeg by rememberSaveable {
+        mutableStateOf<MatchLeg?>(null)
+    }
+
     var selectedHomeTeamId by rememberSaveable {
         mutableStateOf<String?>(null)
     }
@@ -130,13 +143,22 @@ fun ScheduleMatchCard(
         selectedDate != null &&
                 availableMatchSlots.isNotEmpty()
 
+    val isKnockoutStage = selectedStage != MatchStage.REGULAR
+
+    val hasValidStageSelection = if (isKnockoutStage) {
+        selectedLeg != null && onScheduleKnockoutMatch != null
+    } else {
+        selectedLeg == null
+    }
+
     val canSchedule =
         selectedHome != null &&
                 selectedAway != null &&
                 selectedHome != selectedAway &&
                 selectedDate != null &&
                 selectedMatchSlot != null &&
-                selectedMatchSlot in availableMatchSlots
+                selectedMatchSlot in availableMatchSlots &&
+                hasValidStageSelection
 
     if (showDatePicker) {
         ScheduleDatePickerDialog(
@@ -165,6 +187,15 @@ fun ScheduleMatchCard(
             Text(
                 text = "Agendar Novo Jogo",
                 style = MaterialTheme.typography.titleMedium
+            )
+
+            MatchStageSelector(
+                selectedStage = selectedStage,
+                selectedLeg = selectedLeg,
+                onSelectionChange = { stage, leg ->
+                    selectedStage = stage
+                    selectedLeg = leg
+                }
             )
 
             TeamDropdown(
@@ -217,37 +248,51 @@ fun ScheduleMatchCard(
                 }
             )
 
+
             Button(
                 onClick = {
-                    val home = selectedHome
-                    val away = selectedAway
-                    val date = selectedDate
-                    val slot = selectedMatchSlot
+                    val home = selectedHome ?: return@Button
+                    val away = selectedAway ?: return@Button
+                    val date = selectedDate ?: return@Button
+                    val slot = selectedMatchSlot ?: return@Button
 
-                    if (
-                        home != null &&
-                        away != null &&
-                        home != away &&
-                        date != null &&
-                        slot != null
-                    ) {
-                        onScheduleMatch(
-                            home,
-                            away,
-                            date,
-                            slot
-                        )
-
-                        selectedHomeTeamId = null
-                        selectedAwayTeamId = null
-                        selectedMatchNumber = null
+                    if (!canSchedule) {
+                        return@Button
                     }
+
+                    when (selectedStage) {
+                        MatchStage.REGULAR -> {
+                            onScheduleMatch(home, away, date, slot)
+                        }
+
+                        MatchStage.SEMIFINAL,
+                        MatchStage.FINAL -> {
+                            val leg = selectedLeg ?: return@Button
+                            val callback = onScheduleKnockoutMatch
+                                ?: return@Button
+
+                            callback(
+                                home,
+                                away,
+                                date,
+                                slot,
+                                selectedStage,
+                                leg
+                            )
+                        }
+                    }
+
+                    selectedHomeTeamId = null
+                    selectedAwayTeamId = null
+                    selectedMatchNumber = null
+                    selectedLeg = null
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = canSchedule
             ) {
                 Text("Agendar")
             }
+
         }
     }
 }
