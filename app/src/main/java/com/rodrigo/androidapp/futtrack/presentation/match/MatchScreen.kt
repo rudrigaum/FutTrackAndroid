@@ -12,13 +12,21 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,15 +39,18 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.R
 import com.rodrigo.androidapp.futtrack.domain.model.Match
-import com.rodrigo.androidapp.futtrack.domain.model.MatchSlot
-import com.rodrigo.androidapp.futtrack.domain.model.Team
 import com.rodrigo.androidapp.futtrack.domain.model.MatchLeg
+import com.rodrigo.androidapp.futtrack.domain.model.MatchSlot
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStage
+import com.rodrigo.androidapp.futtrack.domain.model.Team
+import com.rodrigo.androidapp.futtrack.domain.usecase.KnockoutSchedulingError
+import com.rodrigo.androidapp.futtrack.domain.usecase.KnockoutSchedulingResult
 import com.rodrigo.androidapp.futtrack.presentation.auth.AuthViewModel
 import com.rodrigo.androidapp.futtrack.presentation.match.components.MatchListSection
 import com.rodrigo.androidapp.futtrack.presentation.match.components.ScheduleMatchCard
 import com.rodrigo.androidapp.futtrack.presentation.match.components.ScoreDialog
 import com.rodrigo.androidapp.futtrack.ui.theme.FutTrackTheme
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -49,10 +60,19 @@ fun MatchRoute(
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val knockoutSchedulingResult by
+    viewModel.knockoutSchedulingResult.collectAsStateWithLifecycle()
+    val regularSchedulingResult by
+    viewModel.regularSchedulingResult.collectAsStateWithLifecycle()
+    val knockoutPersistenceFailure by
+    viewModel.knockoutPersistenceFailure.collectAsStateWithLifecycle()
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
 
     MatchScreen(
         uiState = uiState,
+        knockoutSchedulingResult = knockoutSchedulingResult,
+        regularSchedulingResult = regularSchedulingResult,
+        knockoutPersistenceFailure = knockoutPersistenceFailure,
         isAdminMode = authUiState.isAdminMode,
         getAvailableMatchSlots = viewModel::getAvailableMatchSlots,
         onScheduleMatch = { home, away, date, slot ->
@@ -76,7 +96,13 @@ fun MatchRoute(
         onDeleteMatch = viewModel::deleteMatch,
         onFinishMatch = viewModel::finishMatch,
         onOlderMonthClick = viewModel::selectOlderMonth,
-        onNewerMonthClick = viewModel::selectNewerMonth
+        onNewerMonthClick = viewModel::selectNewerMonth,
+        onKnockoutSchedulingResultConsumed =
+            viewModel::consumeKnockoutSchedulingResult,
+        onRegularSchedulingResultConsumed =
+            viewModel::consumeRegularSchedulingResult,
+        onKnockoutPersistenceFailureConsumed =
+            viewModel::consumeKnockoutPersistenceFailure
     )
 }
 
@@ -97,15 +123,111 @@ fun MatchScreen(
     onDeleteMatch: (String) -> Unit,
     onFinishMatch: (String, Int, Int) -> Unit,
     onOlderMonthClick: () -> Unit,
-    onNewerMonthClick: () -> Unit
+    onNewerMonthClick: () -> Unit,
+    knockoutSchedulingResult: KnockoutSchedulingResult? = null,
+    onKnockoutSchedulingResultConsumed: () -> Unit = {},
+    regularSchedulingResult: RegularMatchSchedulingResult? = null,
+    onRegularSchedulingResultConsumed: () -> Unit = {},
+    knockoutPersistenceFailure: Boolean = false,
+    onKnockoutPersistenceFailureConsumed: () -> Unit = {}
 ) {
     var matchToScore by remember {
         mutableStateOf<Match?>(null)
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
+
+    var schedulingFormResetKey by rememberSaveable {
+        mutableIntStateOf(0)
+    }
+
+    LaunchedEffect(knockoutSchedulingResult) {
+        val result = knockoutSchedulingResult ?: return@LaunchedEffect
+
+        if (result == KnockoutSchedulingResult.Valid) {
+            schedulingFormResetKey++
+        }
+
+        val message = when (result) {
+            KnockoutSchedulingResult.Valid ->
+                "Jogo eliminatório agendado com sucesso."
+
+            is KnockoutSchedulingResult.Invalid ->
+                result.error.toDisplayMessage()
+        }
+
+        val duration = if (result is KnockoutSchedulingResult.Invalid) {
+            SnackbarDuration.Long
+        } else {
+            SnackbarDuration.Short
+        }
+
+        // Keep the Snackbar alive when consuming the result changes the effect key.
+        snackbarScope.launch {
+            snackbarHostState.showSnackbar(
+                message = message,
+                withDismissAction = true,
+                duration = duration
+            )
+        }
+
+        onKnockoutSchedulingResultConsumed()
+    }
+
+    LaunchedEffect(regularSchedulingResult) {
+        val result = regularSchedulingResult ?: return@LaunchedEffect
+
+        if (result == RegularMatchSchedulingResult.Success) {
+            schedulingFormResetKey++
+        }
+
+        val message = when (result) {
+            RegularMatchSchedulingResult.Success ->
+                "Jogo da fase regular agendado com sucesso."
+
+            RegularMatchSchedulingResult.Failure ->
+                "Não foi possível agendar o jogo da fase regular. Tente novamente."
+        }
+
+        snackbarScope.launch {
+            snackbarHostState.showSnackbar(
+                message = message,
+                withDismissAction = true,
+                duration = if (result == RegularMatchSchedulingResult.Failure) {
+                    SnackbarDuration.Long
+                } else {
+                    SnackbarDuration.Short
+                }
+            )
+        }
+
+        onRegularSchedulingResultConsumed()
+    }
+
+    LaunchedEffect(knockoutPersistenceFailure) {
+        if (!knockoutPersistenceFailure) {
+            return@LaunchedEffect
+        }
+
+        // Keep the message visible after consuming the one-time failure.
+        snackbarScope.launch {
+            snackbarHostState.showSnackbar(
+                message = "Não foi possível agendar o jogo eliminatório. Tente novamente.",
+                withDismissAction = true,
+                duration = SnackbarDuration.Long
+            )
+        }
+
+        onKnockoutPersistenceFailureConsumed()
+    }
+
     Scaffold(
         topBar = {
             MatchTopBar()
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
         }
     ) { paddingValues ->
         if (uiState.isLoading) {
@@ -121,6 +243,7 @@ fun MatchScreen(
                 getAvailableMatchSlots = getAvailableMatchSlots,
                 onScheduleMatch = onScheduleMatch,
                 onScheduleKnockoutMatch = onScheduleKnockoutMatch,
+                schedulingFormResetKey = schedulingFormResetKey,
                 onDeleteMatch = onDeleteMatch,
                 onScoreClick = { match ->
                     matchToScore = match
@@ -154,6 +277,7 @@ fun MatchScreen(
         )
     }
 }
+
 @Composable
 private fun MatchContent(
     uiState: MatchUiState,
@@ -168,6 +292,7 @@ private fun MatchContent(
         MatchStage,
         MatchLeg
     ) -> Unit,
+    schedulingFormResetKey: Int,
     onDeleteMatch: (String) -> Unit,
     onScoreClick: (Match) -> Unit,
     onOlderMonthClick: () -> Unit,
@@ -188,12 +313,14 @@ private fun MatchContent(
         modifier = modifier,
         headerContent = if (isAdminMode) {
             {
-                ScheduleMatchCard(
-                    availableTeams = uiState.availableTeams,
-                    getAvailableMatchSlots = getAvailableMatchSlots,
-                    onScheduleMatch = onScheduleMatch,
-                    onScheduleKnockoutMatch = onScheduleKnockoutMatch
-                )
+                key(schedulingFormResetKey) {
+                    ScheduleMatchCard(
+                        availableTeams = uiState.availableTeams,
+                        getAvailableMatchSlots = getAvailableMatchSlots,
+                        onScheduleMatch = onScheduleMatch,
+                        onScheduleKnockoutMatch = onScheduleKnockoutMatch
+                    )
+                }
             }
         } else {
             null
@@ -305,9 +432,42 @@ private fun MatchScreenPreview() {
             onDeleteMatch = {},
             onFinishMatch = { _, _, _ -> },
             onOlderMonthClick = {},
-            onNewerMonthClick = {}
+            onNewerMonthClick = {},
+            onKnockoutSchedulingResultConsumed = {}
         )
     }
+}
+
+private fun KnockoutSchedulingError.toDisplayMessage(): String = when (this) {
+    KnockoutSchedulingError.INVALID_STAGE ->
+        "A fase selecionada não é eliminatória."
+
+    KnockoutSchedulingError.MISSING_LEG ->
+        "Selecione o jogo de ida ou de volta."
+
+    KnockoutSchedulingError.SAME_TEAM ->
+        "Selecione dois times diferentes."
+
+    KnockoutSchedulingError.MISSING_MATCH_NUMBER ->
+        "Selecione o número do jogo."
+
+    KnockoutSchedulingError.OCCUPIED_SLOT ->
+        "Esse horário já possui uma partida agendada."
+
+    KnockoutSchedulingError.DUPLICATE_LEG ->
+        "Já existe um jogo dessa etapa e perna."
+
+    KnockoutSchedulingError.MISSING_FIRST_LEG ->
+        "Agende o jogo de ida antes do jogo de volta."
+
+    KnockoutSchedulingError.INVALID_OPPONENTS ->
+        "Os times devem ser os mesmos do jogo de ida."
+
+    KnockoutSchedulingError.INVALID_HOME_AWAY_ORDER ->
+        "Inverta o mandante e o visitante no jogo de volta."
+
+    KnockoutSchedulingError.INVALID_LEG_DATE ->
+        "O jogo de volta deve ocorrer após o jogo de ida."
 }
 
 private val PREVIEW_TEAMS =

@@ -8,6 +8,8 @@ import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.Team
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
 import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
+import com.rodrigo.androidapp.futtrack.domain.usecase.KnockoutSchedulingError
+import com.rodrigo.androidapp.futtrack.domain.usecase.KnockoutSchedulingResult
 import com.rodrigo.androidapp.futtrack.domain.usecase.ScheduleKnockoutMatchUseCase
 import com.rodrigo.androidapp.futtrack.domain.usecase.ValidateKnockoutSchedulingUseCase
 import kotlinx.coroutines.Dispatchers
@@ -559,6 +561,10 @@ class MatchViewModelTest {
             assertEquals(HOME_TEAM.id, scheduledMatch.homeTeamId)
             assertEquals(AWAY_TEAM.id, scheduledMatch.awayTeamId)
             assertEquals(MatchSlot.GAME_1.matchNumber, scheduledMatch.matchNumber)
+            assertEquals(
+                KnockoutSchedulingResult.Valid,
+                viewModel.knockoutSchedulingResult.value
+            )
         }
 
     @Test
@@ -581,6 +587,10 @@ class MatchViewModelTest {
             advanceUntilIdle()
 
             assertTrue(matchRepository.scheduledMatches.isEmpty())
+            assertEquals(
+                KnockoutSchedulingResult.Invalid(KnockoutSchedulingError.MISSING_FIRST_LEG),
+                viewModel.knockoutSchedulingResult.value
+            )
         }
 
     @Test
@@ -612,6 +622,10 @@ class MatchViewModelTest {
             advanceUntilIdle()
 
             assertTrue(matchRepository.scheduledMatches.isEmpty())
+            assertEquals(
+                KnockoutSchedulingResult.Invalid(KnockoutSchedulingError.DUPLICATE_LEG),
+                viewModel.knockoutSchedulingResult.value
+            )
         }
 
     @Test
@@ -643,6 +657,103 @@ class MatchViewModelTest {
             advanceUntilIdle()
 
             assertTrue(matchRepository.scheduledMatches.isEmpty())
+            assertEquals(
+                KnockoutSchedulingResult.Invalid(KnockoutSchedulingError.INVALID_HOME_AWAY_ORDER),
+                viewModel.knockoutSchedulingResult.value
+            )
+        }
+
+    @Test
+    fun `should expose persistence failure without reporting knockout success`() =
+        runTest(testDispatcher) {
+            matchRepository.schedulingFailure =
+                IllegalStateException("Simulated persistence failure")
+
+            val viewModel = createViewModel()
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.scheduleNewMatch(
+                homeTeamId = HOME_TEAM.id,
+                awayTeamId = AWAY_TEAM.id,
+                date = TEST_DATE,
+                slot = MatchSlot.GAME_1,
+                stage = MatchStage.SEMIFINAL,
+                leg = MatchLeg.FIRST
+            )
+
+            advanceUntilIdle()
+
+            assertTrue(matchRepository.scheduledMatches.isEmpty())
+            assertNull(viewModel.knockoutSchedulingResult.value)
+            assertTrue(viewModel.knockoutPersistenceFailure.value)
+
+            viewModel.consumeKnockoutPersistenceFailure()
+            assertFalse(viewModel.knockoutPersistenceFailure.value)
+        }
+
+    @Test
+    fun `should clear knockout scheduling result after acknowledgment`() =
+        runTest(testDispatcher) {
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            viewModel.scheduleNewMatch(
+                homeTeamId = AWAY_TEAM.id,
+                awayTeamId = HOME_TEAM.id,
+                date = TEST_DATE,
+                slot = MatchSlot.GAME_2,
+                stage = MatchStage.SEMIFINAL,
+                leg = MatchLeg.SECOND
+            )
+
+            advanceUntilIdle()
+
+            assertEquals(
+                KnockoutSchedulingResult.Invalid(
+                    KnockoutSchedulingError.MISSING_FIRST_LEG
+                ),
+                viewModel.knockoutSchedulingResult.value
+            )
+
+            viewModel.consumeKnockoutSchedulingResult()
+
+            assertNull(viewModel.knockoutSchedulingResult.value)
+        }
+
+    @Test
+    fun `should expose same knockout error after previous result was consumed`() =
+        runTest(testDispatcher) {
+            val viewModel = createViewModel()
+
+            collectUiState(viewModel)
+            advanceUntilIdle()
+
+            repeat(2) { attempt ->
+                viewModel.scheduleNewMatch(
+                    homeTeamId = AWAY_TEAM.id,
+                    awayTeamId = HOME_TEAM.id,
+                    date = TEST_DATE,
+                    slot = MatchSlot.GAME_2,
+                    stage = MatchStage.SEMIFINAL,
+                    leg = MatchLeg.SECOND
+                )
+
+                advanceUntilIdle()
+
+                assertEquals(
+                    "Attempt ${attempt + 1}",
+                    KnockoutSchedulingResult.Invalid(
+                        KnockoutSchedulingError.MISSING_FIRST_LEG
+                    ),
+                    viewModel.knockoutSchedulingResult.value
+                )
+
+                viewModel.consumeKnockoutSchedulingResult()
+                assertNull(viewModel.knockoutSchedulingResult.value)
+            }
         }
 
     @Test
@@ -731,26 +842,22 @@ class MatchViewModelTest {
             )
         }
 
-
     private fun createViewModel(): MatchViewModel {
         val validateKnockoutSchedulingUseCase =
             ValidateKnockoutSchedulingUseCase()
 
-        val scheduleKnockoutMatchUseCase =
-            ScheduleKnockoutMatchUseCase(
-                matchRepository = matchRepository,
-                validateKnockoutSchedulingUseCase =
-                    validateKnockoutSchedulingUseCase
-            )
+        val scheduleKnockoutMatchUseCase = ScheduleKnockoutMatchUseCase(
+            matchRepository = matchRepository,
+            validateKnockoutSchedulingUseCase =
+                validateKnockoutSchedulingUseCase
+        )
 
         return MatchViewModel(
             teamRepository = teamRepository,
             matchRepository = matchRepository,
-            scheduleKnockoutMatchUseCase =
-                scheduleKnockoutMatchUseCase
+            scheduleKnockoutMatchUseCase = scheduleKnockoutMatchUseCase
         )
     }
-
 
     private fun kotlinx.coroutines.test.TestScope.collectUiState(
         viewModel: MatchViewModel
@@ -806,12 +913,14 @@ class MatchViewModelTest {
         val scheduledMatches = mutableListOf<Match>()
         val updatedMatches = mutableListOf<Match>()
         val deletedMatchIds = mutableListOf<String>()
+        var schedulingFailure: Exception? = null
 
         override fun getMatches(): Flow<List<Match>> {
             return matches.asStateFlow()
         }
 
         override suspend fun scheduleMatch(match: Match) {
+            schedulingFailure?.let { throw it }
             scheduledMatches += match
 
             matches.value =

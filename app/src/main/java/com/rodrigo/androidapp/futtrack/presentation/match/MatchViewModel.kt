@@ -13,6 +13,7 @@ import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
 import com.rodrigo.androidapp.futtrack.domain.usecase.KnockoutSchedulingResult
 import com.rodrigo.androidapp.futtrack.domain.usecase.ScheduleKnockoutMatchUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +36,11 @@ data class MatchUiState(
     val canSelectNewerMonth: Boolean = false
 )
 
+sealed interface RegularMatchSchedulingResult {
+    data object Success : RegularMatchSchedulingResult
+    data object Failure : RegularMatchSchedulingResult
+}
+
 @HiltViewModel
 class MatchViewModel @Inject constructor(
     private val teamRepository: TeamRepository,
@@ -49,6 +55,29 @@ class MatchViewModel @Inject constructor(
 
     val knockoutSchedulingResult: StateFlow<KnockoutSchedulingResult?> =
         _knockoutSchedulingResult.asStateFlow()
+
+    private val _knockoutPersistenceFailure = MutableStateFlow(false)
+
+    val knockoutPersistenceFailure: StateFlow<Boolean> =
+        _knockoutPersistenceFailure.asStateFlow()
+
+    private val _regularSchedulingResult =
+        MutableStateFlow<RegularMatchSchedulingResult?>(null)
+
+    val regularSchedulingResult: StateFlow<RegularMatchSchedulingResult?> =
+        _regularSchedulingResult.asStateFlow()
+
+    fun consumeKnockoutSchedulingResult() {
+        _knockoutSchedulingResult.value = null
+    }
+
+    fun consumeKnockoutPersistenceFailure() {
+        _knockoutPersistenceFailure.value = false
+    }
+
+    fun consumeRegularSchedulingResult() {
+        _regularSchedulingResult.value = null
+    }
 
     val uiState: StateFlow<MatchUiState> = combine(
         teamRepository.getTeams(),
@@ -143,12 +172,35 @@ class MatchViewModel @Inject constructor(
 
         _knockoutSchedulingResult.value = null
 
+        if (stage == MatchStage.REGULAR) {
+            _regularSchedulingResult.value = null
+        } else {
+            _knockoutPersistenceFailure.value = false
+        }
+
         viewModelScope.launch {
             when (stage) {
-                MatchStage.REGULAR -> matchRepository.scheduleMatch(match)
+                MatchStage.REGULAR -> {
+                    try {
+                        matchRepository.scheduleMatch(match)
+                        _regularSchedulingResult.value =
+                            RegularMatchSchedulingResult.Success
+                    } catch (exception: CancellationException) {
+                        throw exception
+                    } catch (exception: Exception) {
+                        _regularSchedulingResult.value =
+                            RegularMatchSchedulingResult.Failure
+                    }
+                }
                 MatchStage.SEMIFINAL, MatchStage.FINAL -> {
-                    _knockoutSchedulingResult.value =
-                        scheduleKnockoutMatchUseCase(match)
+                    try {
+                        _knockoutSchedulingResult.value =
+                            scheduleKnockoutMatchUseCase(match)
+                    } catch (exception: CancellationException) {
+                        throw exception
+                    } catch (exception: Exception) {
+                        _knockoutPersistenceFailure.value = true
+                    }
                 }
             }
         }

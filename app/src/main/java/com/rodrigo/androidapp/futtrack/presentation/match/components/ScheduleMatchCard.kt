@@ -249,6 +249,7 @@ fun ScheduleMatchCard(
             )
 
 
+
             Button(
                 onClick = {
                     val home = selectedHome ?: return@Button
@@ -262,7 +263,12 @@ fun ScheduleMatchCard(
 
                     when (selectedStage) {
                         MatchStage.REGULAR -> {
-                            onScheduleMatch(home, away, date, slot)
+                            onScheduleMatch(
+                                home,
+                                away,
+                                date,
+                                slot
+                            )
                         }
 
                         MatchStage.SEMIFINAL,
@@ -281,11 +287,6 @@ fun ScheduleMatchCard(
                             )
                         }
                     }
-
-                    selectedHomeTeamId = null
-                    selectedAwayTeamId = null
-                    selectedMatchNumber = null
-                    selectedLeg = null
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = canSchedule
