@@ -1,3 +1,4 @@
+
 package com.rodrigo.androidapp.futtrack.domain.model
 
 import java.time.LocalDateTime
@@ -9,6 +10,17 @@ enum class MatchStatus {
     FINISHED
 }
 
+enum class MatchStage {
+    REGULAR,
+    SEMIFINAL,
+    FINAL
+}
+
+enum class MatchLeg {
+    FIRST,
+    SECOND
+}
+
 data class Match(
     val id: String = UUID.randomUUID().toString(),
     val matchNumber: Int? = null,
@@ -17,5 +29,7 @@ data class Match(
     val homeScore: Int? = null,
     val awayScore: Int? = null,
     val date: LocalDateTime,
-    val status: MatchStatus = MatchStatus.SCHEDULED
+    val status: MatchStatus = MatchStatus.SCHEDULED,
+    val stage: MatchStage = MatchStage.REGULAR,
+    val leg: MatchLeg? = null
 )

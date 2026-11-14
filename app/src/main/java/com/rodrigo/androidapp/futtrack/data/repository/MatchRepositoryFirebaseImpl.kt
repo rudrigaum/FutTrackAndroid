@@ -1,17 +1,20 @@
+
 package com.rodrigo.androidapp.futtrack.data.repository
 
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.rodrigo.androidapp.futtrack.domain.model.Match
+import com.rodrigo.androidapp.futtrack.domain.model.MatchLeg
 import com.rodrigo.androidapp.futtrack.domain.model.MatchSlot
+import com.rodrigo.androidapp.futtrack.domain.model.MatchStage
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
+import java.time.LocalDateTime
+import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
-import java.time.LocalDateTime
-import javax.inject.Inject
 
 class MatchRepositoryFirebaseImpl @Inject constructor(
     private val firestore: FirebaseFirestore
@@ -59,7 +62,6 @@ class MatchRepositoryFirebaseImpl @Inject constructor(
         }
 
         val documentId = createMatchDocumentId(match)
-
         val matchDocument = matchesCollection.document(documentId)
 
         firestore.runTransaction { transaction ->
@@ -114,6 +116,13 @@ class MatchRepositoryFirebaseImpl @Inject constructor(
                 ?.let(MatchStatus::valueOf)
                 ?: MatchStatus.SCHEDULED
 
+            val stage = getString(FIELD_STAGE)
+                ?.let(MatchStage::valueOf)
+                ?: MatchStage.REGULAR
+
+            val leg = getString(FIELD_LEG)
+                ?.let(MatchLeg::valueOf)
+
             Match(
                 id = id,
                 matchNumber = getLong(FIELD_MATCH_NUMBER)?.toInt(),
@@ -122,7 +131,9 @@ class MatchRepositoryFirebaseImpl @Inject constructor(
                 homeScore = getLong(FIELD_HOME_SCORE)?.toInt(),
                 awayScore = getLong(FIELD_AWAY_SCORE)?.toInt(),
                 date = date,
-                status = status
+                status = status,
+                stage = stage,
+                leg = leg
             )
         }.getOrNull()
     }
@@ -135,7 +146,9 @@ class MatchRepositoryFirebaseImpl @Inject constructor(
             FIELD_HOME_SCORE to homeScore,
             FIELD_AWAY_SCORE to awayScore,
             FIELD_STATUS to status.name,
-            FIELD_DATE to date.toString()
+            FIELD_DATE to date.toString(),
+            FIELD_STAGE to stage.name,
+            FIELD_LEG to leg?.name
         )
     }
 
@@ -157,6 +170,9 @@ class MatchRepositoryFirebaseImpl @Inject constructor(
         const val FIELD_AWAY_SCORE = "awayScore"
         const val FIELD_STATUS = "status"
         const val FIELD_DATE = "date"
+
+        const val FIELD_STAGE = "stage"
+        const val FIELD_LEG = "leg"
 
         val matchComparator =
             compareBy<Match> { match ->

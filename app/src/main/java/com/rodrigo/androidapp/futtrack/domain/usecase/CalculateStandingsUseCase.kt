@@ -1,6 +1,8 @@
+
 package com.rodrigo.androidapp.futtrack.domain.usecase
 
 import com.rodrigo.androidapp.futtrack.domain.model.Match
+import com.rodrigo.androidapp.futtrack.domain.model.MatchStage
 import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.StandingBaseline
 import com.rodrigo.androidapp.futtrack.domain.model.Team
@@ -21,7 +23,10 @@ class CalculateStandingsUseCase @Inject constructor() {
 
         matches
             .asSequence()
-            .filter { it.status == MatchStatus.FINISHED }
+            .filter { match ->
+                match.status == MatchStatus.FINISHED &&
+                        match.stage == MatchStage.REGULAR
+            }
             .forEach { match ->
                 applyMatch(
                     match = match,
