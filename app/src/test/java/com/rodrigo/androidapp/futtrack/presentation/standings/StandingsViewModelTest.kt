@@ -1,16 +1,25 @@
 package com.rodrigo.androidapp.futtrack.presentation.standings
 
 import com.rodrigo.androidapp.futtrack.domain.model.Match
+import com.rodrigo.androidapp.futtrack.domain.model.MatchLeg
+import com.rodrigo.androidapp.futtrack.domain.model.MatchStage
+import com.rodrigo.androidapp.futtrack.domain.model.MatchStatus
 import com.rodrigo.androidapp.futtrack.domain.model.StandingBaseline
 import com.rodrigo.androidapp.futtrack.domain.model.Team
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
 import com.rodrigo.androidapp.futtrack.domain.repository.StandingBaselineRepository
 import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
+import com.rodrigo.androidapp.futtrack.domain.usecase.CalculateKnockoutProgressionUseCase
 import com.rodrigo.androidapp.futtrack.domain.usecase.CalculateSemifinalStatusUseCase
 import com.rodrigo.androidapp.futtrack.domain.usecase.CalculateStandingsUseCase
+import com.rodrigo.androidapp.futtrack.domain.usecase.KnockoutTieResult
+import com.rodrigo.androidapp.futtrack.domain.usecase.KnockoutVictoryReason
+import com.rodrigo.androidapp.futtrack.domain.usecase.ResolveKnockoutTieUseCase
 import com.rodrigo.androidapp.futtrack.testutil.MainDispatcherRule
+import java.time.LocalDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -35,33 +44,17 @@ class StandingsViewModelTest {
     fun `given three teams when standings are loaded then semifinal status is calculated`() =
         runTest {
             val viewModel = createViewModel(
-                teams = listOf(
-                    brazil,
-                    italy,
-                    germany
-                ),
+                teams = listOf(brazil, italy, germany),
                 baselines = listOf(
-                    baseline(
-                        team = brazil,
-                        points = 110
-                    ),
-                    baseline(
-                        team = italy,
-                        points = 100
-                    ),
-                    baseline(
-                        team = germany,
-                        points = 70
-                    )
+                    baseline(team = brazil, points = 110),
+                    baseline(team = italy, points = 100),
+                    baseline(team = germany, points = 70)
                 )
             )
 
-            backgroundScope.launch(
-                UnconfinedTestDispatcher(testScheduler)
-            ) {
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
                 viewModel.uiState.collect()
             }
-
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
@@ -69,22 +62,10 @@ class StandingsViewModelTest {
 
             assertFalse(state.isLoading)
             assertNotNull(semifinalStatus)
-
             requireNotNull(semifinalStatus)
-
-            assertEquals(
-                italy,
-                semifinalStatus.secondPlaceTeam
-            )
-            assertEquals(
-                germany,
-                semifinalStatus.thirdPlaceTeam
-            )
-            assertEquals(
-                30.0,
-                semifinalStatus.differencePercentage,
-                DOUBLE_DELTA
-            )
+            assertEquals(italy, semifinalStatus.secondPlaceTeam)
+            assertEquals(germany, semifinalStatus.thirdPlaceTeam)
+            assertEquals(30.0, semifinalStatus.differencePercentage, DOUBLE_DELTA)
             assertTrue(semifinalStatus.isEligible)
         }
 
@@ -92,47 +73,23 @@ class StandingsViewModelTest {
     fun `given difference above thirty percent when standings are loaded then semifinal is not eligible`() =
         runTest {
             val viewModel = createViewModel(
-                teams = listOf(
-                    brazil,
-                    italy,
-                    germany
-                ),
+                teams = listOf(brazil, italy, germany),
                 baselines = listOf(
-                    baseline(
-                        team = brazil,
-                        points = 110
-                    ),
-                    baseline(
-                        team = italy,
-                        points = 101
-                    ),
-                    baseline(
-                        team = germany,
-                        points = 70
-                    )
+                    baseline(team = brazil, points = 110),
+                    baseline(team = italy, points = 101),
+                    baseline(team = germany, points = 70)
                 )
             )
 
-            backgroundScope.launch(
-                UnconfinedTestDispatcher(testScheduler)
-            ) {
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
                 viewModel.uiState.collect()
             }
-
             advanceUntilIdle()
 
-            val semifinalStatus =
-                viewModel.uiState.value.semifinalStatus
-
+            val semifinalStatus = viewModel.uiState.value.semifinalStatus
             assertNotNull(semifinalStatus)
-
             requireNotNull(semifinalStatus)
-
-            assertEquals(
-                30.693069,
-                semifinalStatus.differencePercentage,
-                DOUBLE_DELTA
-            )
+            assertEquals(30.693069, semifinalStatus.differencePercentage, DOUBLE_DELTA)
             assertFalse(semifinalStatus.isEligible)
         }
 
@@ -140,110 +97,258 @@ class StandingsViewModelTest {
     fun `given fewer than three teams when standings are loaded then semifinal status is null`() =
         runTest {
             val viewModel = createViewModel(
-                teams = listOf(
-                    brazil,
-                    italy
-                ),
+                teams = listOf(brazil, italy),
                 baselines = listOf(
-                    baseline(
-                        team = brazil,
-                        points = 110
-                    ),
-                    baseline(
-                        team = italy,
-                        points = 100
-                    )
+                    baseline(team = brazil, points = 110),
+                    baseline(team = italy, points = 100)
                 )
             )
 
-            backgroundScope.launch(
-                UnconfinedTestDispatcher(testScheduler)
-            ) {
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
                 viewModel.uiState.collect()
             }
-
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-
             assertFalse(state.isLoading)
-            assertEquals(
-                2,
-                state.standings.size
-            )
+            assertEquals(2, state.standings.size)
             assertNull(state.semifinalStatus)
+            assertNull(state.knockoutProgression)
+        }
+
+    @Test
+    fun `aggregate semifinal tie exposes the better regular season team as finalist`() =
+        runTest {
+            val viewModel = createViewModel(
+                teams = listOf(brazil, italy, germany),
+                baselines = regularBaselines(),
+                matchRepository = FakeMatchRepository(
+                    listOf(semifinalFirstLeg(), semifinalSecondLeg())
+                )
+            )
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                viewModel.uiState.collect()
+            }
+            advanceUntilIdle()
+
+            val progression = requireNotNull(viewModel.uiState.value.knockoutProgression)
+            val semifinal = progression.semifinalResult as KnockoutTieResult.Decided
+
+            assertEquals(italy.id, semifinal.winnerTeamId)
+            assertEquals(
+                KnockoutVictoryReason.BETTER_REGULAR_SEASON,
+                semifinal.reason
+            )
+            assertEquals(italy.id, progression.finalOpponentTeamId)
+            assertEquals(KnockoutTieResult.Pending, progression.finalResult)
+        }
+
+    @Test
+    fun `finishing knockout legs updates semifinal finalist and final champion reactively`() =
+        runTest {
+            val matchRepository = FakeMatchRepository(listOf(semifinalFirstLeg()))
+            val viewModel = createViewModel(
+                teams = listOf(brazil, italy, germany),
+                baselines = regularBaselines(),
+                matchRepository = matchRepository
+            )
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                viewModel.uiState.collect()
+            }
+            advanceUntilIdle()
+
+            val initial = requireNotNull(viewModel.uiState.value.knockoutProgression)
+            assertEquals(KnockoutTieResult.Pending, initial.semifinalResult)
+            assertNull(initial.finalOpponentTeamId)
+            assertEquals(KnockoutTieResult.Pending, initial.finalResult)
+
+            matchRepository.setMatches(listOf(semifinalFirstLeg(), semifinalSecondLeg()))
+            advanceUntilIdle()
+
+            val afterSemifinal = requireNotNull(viewModel.uiState.value.knockoutProgression)
+            assertEquals(italy.id, afterSemifinal.finalOpponentTeamId)
+            assertEquals(KnockoutTieResult.Pending, afterSemifinal.finalResult)
+
+            matchRepository.setMatches(
+                listOf(
+                    semifinalFirstLeg(),
+                    semifinalSecondLeg(),
+                    finalFirstLeg(homeScore = 1, awayScore = 0),
+                    finalSecondLeg(homeScore = 1, awayScore = 0)
+                )
+            )
+            advanceUntilIdle()
+
+            val final = requireNotNull(viewModel.uiState.value.knockoutProgression)
+                .finalResult as KnockoutTieResult.Decided
+            assertEquals(brazil.id, final.winnerTeamId)
+            assertEquals(
+                KnockoutVictoryReason.BETTER_REGULAR_SEASON,
+                final.reason
+            )
+        }
+
+    @Test
+    fun `direct final exposes runner up and aggregate champion without semifinal`() =
+        runTest {
+            val viewModel = createViewModel(
+                teams = listOf(brazil, italy, germany),
+                baselines = listOf(
+                    baseline(team = brazil, points = 110),
+                    baseline(team = italy, points = 101),
+                    baseline(team = germany, points = 70)
+                ),
+                matchRepository = FakeMatchRepository(
+                    listOf(
+                        finalFirstLeg(homeScore = 0, awayScore = 1),
+                        finalSecondLeg(homeScore = 2, awayScore = 1)
+                    )
+                )
+            )
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                viewModel.uiState.collect()
+            }
+            advanceUntilIdle()
+
+            val progression = requireNotNull(viewModel.uiState.value.knockoutProgression)
+            val final = progression.finalResult as KnockoutTieResult.Decided
+            assertNull(progression.semifinalResult)
+            assertEquals(italy.id, progression.finalOpponentTeamId)
+            assertEquals(italy.id, final.winnerTeamId)
+            assertEquals(
+                KnockoutVictoryReason.AGGREGATE_SCORE,
+                final.reason
+            )
         }
 
     private fun createViewModel(
         teams: List<Team>,
-        baselines: List<StandingBaseline>
+        baselines: List<StandingBaseline>,
+        matchRepository: FakeMatchRepository = FakeMatchRepository()
     ): StandingsViewModel {
+        val semifinalStatusUseCase = CalculateSemifinalStatusUseCase()
         return StandingsViewModel(
-            teamRepository = FakeTeamRepository(
-                teams = teams
-            ),
-            matchRepository = FakeMatchRepository(),
-            standingBaselineRepository =
-                FakeStandingBaselineRepository(
-                    baselines = baselines
-                ),
-            calculateStandingsUseCase =
-                CalculateStandingsUseCase(),
-            calculateSemifinalStatusUseCase =
-                CalculateSemifinalStatusUseCase()
+            teamRepository = FakeTeamRepository(teams = teams),
+            matchRepository = matchRepository,
+            standingBaselineRepository = FakeStandingBaselineRepository(baselines = baselines),
+            calculateStandingsUseCase = CalculateStandingsUseCase(),
+            calculateSemifinalStatusUseCase = semifinalStatusUseCase,
+            calculateKnockoutProgressionUseCase = CalculateKnockoutProgressionUseCase(
+                calculateSemifinalStatusUseCase = semifinalStatusUseCase,
+                resolveKnockoutTieUseCase = ResolveKnockoutTieUseCase()
+            )
         )
     }
 
-    private fun baseline(
-        team: Team,
-        points: Int
-    ): StandingBaseline {
-        return StandingBaseline(
-            teamId = team.id,
-            points = points,
-            matchesPlayed = 0,
-            wins = 0,
-            draws = 0,
-            losses = 0,
-            goalsFor = 0,
-            goalsAgainst = 0
-        )
-    }
+    private fun regularBaselines() = listOf(
+        baseline(team = brazil, points = 110),
+        baseline(team = italy, points = 100),
+        baseline(team = germany, points = 70)
+    )
 
-    private class FakeTeamRepository(
-        private val teams: List<Team>
-    ) : TeamRepository {
+    private fun baseline(team: Team, points: Int): StandingBaseline = StandingBaseline(
+        teamId = team.id,
+        points = points,
+        matchesPlayed = 0,
+        wins = 0,
+        draws = 0,
+        losses = 0,
+        goalsFor = 0,
+        goalsAgainst = 0
+    )
 
-        override fun getTeams(): Flow<List<Team>> =
-            flowOf(teams)
+    private fun semifinalFirstLeg() = finishedMatch(
+        id = "semifinal-first",
+        stage = MatchStage.SEMIFINAL,
+        leg = MatchLeg.FIRST,
+        home = italy,
+        away = germany,
+        homeScore = 2,
+        awayScore = 1
+    )
 
+    private fun semifinalSecondLeg() = finishedMatch(
+        id = "semifinal-second",
+        stage = MatchStage.SEMIFINAL,
+        leg = MatchLeg.SECOND,
+        home = germany,
+        away = italy,
+        homeScore = 1,
+        awayScore = 0
+    )
+
+    private fun finalFirstLeg(homeScore: Int, awayScore: Int) = finishedMatch(
+        id = "final-first",
+        stage = MatchStage.FINAL,
+        leg = MatchLeg.FIRST,
+        home = brazil,
+        away = italy,
+        homeScore = homeScore,
+        awayScore = awayScore
+    )
+
+    private fun finalSecondLeg(homeScore: Int, awayScore: Int) = finishedMatch(
+        id = "final-second",
+        stage = MatchStage.FINAL,
+        leg = MatchLeg.SECOND,
+        home = italy,
+        away = brazil,
+        homeScore = homeScore,
+        awayScore = awayScore
+    )
+
+    private fun finishedMatch(
+        id: String,
+        stage: MatchStage,
+        leg: MatchLeg,
+        home: Team,
+        away: Team,
+        homeScore: Int,
+        awayScore: Int
+    ) = Match(
+        id = id,
+        homeTeamId = home.id,
+        awayTeamId = away.id,
+        homeScore = homeScore,
+        awayScore = awayScore,
+        date = if (leg == MatchLeg.FIRST) {
+            LocalDateTime.of(2026, 10, 24, 9, 0)
+        } else {
+            LocalDateTime.of(2026, 10, 31, 9, 0)
+        },
+        status = MatchStatus.FINISHED,
+        stage = stage,
+        leg = leg
+    )
+
+    private class FakeTeamRepository(private val teams: List<Team>) : TeamRepository {
+        override fun getTeams(): Flow<List<Team>> = flowOf(teams)
         override suspend fun addTeam(team: Team) = Unit
-
         override suspend fun deleteTeam(teamId: String) = Unit
     }
 
-    private class FakeMatchRepository : MatchRepository {
+    private class FakeMatchRepository(
+        initialMatches: List<Match> = emptyList()
+    ) : MatchRepository {
+        private val matches = MutableStateFlow(initialMatches)
 
-        override fun getMatches(): Flow<List<Match>> =
-            flowOf(emptyList())
-
+        override fun getMatches(): Flow<List<Match>> = matches
         override suspend fun scheduleMatch(match: Match) = Unit
-
         override suspend fun deleteMatch(matchId: String) = Unit
-
         override suspend fun updateMatch(match: Match) = Unit
+
+        fun setMatches(updated: List<Match>) {
+            matches.value = updated
+        }
     }
 
     private class FakeStandingBaselineRepository(
         private val baselines: List<StandingBaseline>
     ) : StandingBaselineRepository {
-
-        override fun getBaselines(): Flow<List<StandingBaseline>> =
-            flowOf(baselines)
+        override fun getBaselines(): Flow<List<StandingBaseline>> = flowOf(baselines)
     }
 
     private companion object {
-
         const val DOUBLE_DELTA = 0.000001
 
         val brazil = Team(
@@ -251,13 +356,11 @@ class StandingsViewModelTest {
             name = "Brasil",
             isoCode = "BRA"
         )
-
         val italy = Team(
             id = "team_italy",
             name = "Itália",
             isoCode = "ITA"
         )
-
         val germany = Team(
             id = "team_germany",
             name = "Alemanha",
