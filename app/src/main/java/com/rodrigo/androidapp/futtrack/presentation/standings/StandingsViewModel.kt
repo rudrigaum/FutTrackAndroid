@@ -2,13 +2,17 @@ package com.rodrigo.androidapp.futtrack.presentation.standings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rodrigo.androidapp.futtrack.domain.model.Match
+import com.rodrigo.androidapp.futtrack.domain.model.MatchStage
 import com.rodrigo.androidapp.futtrack.domain.model.SemifinalStatus
 import com.rodrigo.androidapp.futtrack.domain.model.TeamStanding
 import com.rodrigo.androidapp.futtrack.domain.repository.MatchRepository
 import com.rodrigo.androidapp.futtrack.domain.repository.StandingBaselineRepository
 import com.rodrigo.androidapp.futtrack.domain.repository.TeamRepository
+import com.rodrigo.androidapp.futtrack.domain.usecase.CalculateKnockoutProgressionUseCase
 import com.rodrigo.androidapp.futtrack.domain.usecase.CalculateSemifinalStatusUseCase
 import com.rodrigo.androidapp.futtrack.domain.usecase.CalculateStandingsUseCase
+import com.rodrigo.androidapp.futtrack.domain.usecase.KnockoutProgression
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +24,9 @@ import javax.inject.Inject
 data class StandingsUiState(
     val isLoading: Boolean = true,
     val standings: List<TeamStanding> = emptyList(),
-    val semifinalStatus: SemifinalStatus? = null
+    val semifinalStatus: SemifinalStatus? = null,
+    val knockoutProgression: KnockoutProgression? = null,
+    val knockoutMatches: List<Match> = emptyList()
 )
 
 @HiltViewModel
@@ -29,7 +35,8 @@ class StandingsViewModel @Inject constructor(
     private val matchRepository: MatchRepository,
     private val standingBaselineRepository: StandingBaselineRepository,
     private val calculateStandingsUseCase: CalculateStandingsUseCase,
-    private val calculateSemifinalStatusUseCase: CalculateSemifinalStatusUseCase
+    private val calculateSemifinalStatusUseCase: CalculateSemifinalStatusUseCase,
+    private val calculateKnockoutProgressionUseCase: CalculateKnockoutProgressionUseCase
 ) : ViewModel() {
 
     val uiState: StateFlow<StandingsUiState> = combine(
@@ -42,6 +49,10 @@ class StandingsViewModel @Inject constructor(
             !match.date.isBefore(REAL_MATCHES_START_DATE)
         }
 
+        val knockoutMatches = realMatches.filter { match ->
+            match.stage != MatchStage.REGULAR
+        }
+
         val calculatedStandings = calculateStandingsUseCase(
             teams = teams,
             matches = realMatches,
@@ -51,9 +62,18 @@ class StandingsViewModel @Inject constructor(
         StandingsUiState(
             isLoading = false,
             standings = calculatedStandings,
+            knockoutMatches = knockoutMatches,
             semifinalStatus = calculateSemifinalStatus(
                 standings = calculatedStandings
-            )
+            ),
+            knockoutProgression = if (calculatedStandings.size >= REQUIRED_KNOCKOUT_TEAMS) {
+                calculateKnockoutProgressionUseCase(
+                    regularStandings = calculatedStandings,
+                    matches = realMatches
+                )
+            } else {
+                null
+            }
         )
     }.stateIn(
         scope = viewModelScope,
@@ -79,6 +99,7 @@ class StandingsViewModel @Inject constructor(
     private companion object {
         const val SECOND_PLACE_INDEX = 1
         const val THIRD_PLACE_INDEX = 2
+        const val REQUIRED_KNOCKOUT_TEAMS = 3
 
         val REAL_MATCHES_START_DATE: LocalDateTime =
             LocalDateTime.of(2026, 8, 8, 0, 0)

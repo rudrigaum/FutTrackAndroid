@@ -35,6 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rodrigo.androidapp.futtrack.presentation.components.FutTrackTopAppBar
 import com.rodrigo.androidapp.futtrack.presentation.standings.components.KnockoutBracketCard
+import com.rodrigo.androidapp.futtrack.presentation.standings.components.KnockoutProgressionCard
 import com.rodrigo.androidapp.futtrack.ui.theme.FutTrackTheme
 import com.rodrigo.androidapp.futtrack.ui.utils.getTeamCrest
 
@@ -96,11 +97,9 @@ private fun StandingsContent(
     uiState: StandingsUiState,
     modifier: Modifier = Modifier
 ) {
-    val firstPlaceTeam = uiState.standings
-        .firstOrNull()
-        ?.team
-
+    val firstPlaceTeam = uiState.standings.firstOrNull()?.team
     val semifinalStatus = uiState.semifinalStatus
+    val knockoutProgression = uiState.knockoutProgression
 
     LazyColumn(
         modifier = modifier,
@@ -158,15 +157,28 @@ private fun StandingsContent(
         }
 
         if (firstPlaceTeam != null && semifinalStatus != null) {
-            item(
-                key = KNOCKOUT_BRACKET_KEY
-            ) {
+            item(key = KNOCKOUT_CRITERIA_KEY) {
                 KnockoutBracketCard(
                     firstPlaceTeam = firstPlaceTeam,
                     status = semifinalStatus,
                     modifier = Modifier.padding(
                         start = 16.dp,
                         top = 20.dp,
+                        end = 16.dp
+                    )
+                )
+            }
+        }
+
+        if (knockoutProgression != null) {
+            item(key = KNOCKOUT_PROGRESSION_KEY) {
+                KnockoutProgressionCard(
+                    progression = knockoutProgression,
+                    standings = uiState.standings,
+                    matches = uiState.knockoutMatches,
+                    modifier = Modifier.padding(
+                        start = 16.dp,
+                        top = 12.dp,
                         end = 16.dp
                     )
                 )
@@ -414,5 +426,8 @@ private fun StandingRowCompactPreview() {
 private const val STANDINGS_HEADER_KEY =
     "standings_header"
 
-private const val KNOCKOUT_BRACKET_KEY =
-    "knockout_bracket"
+private const val KNOCKOUT_CRITERIA_KEY =
+    "knockout_criteria"
+
+private const val KNOCKOUT_PROGRESSION_KEY =
+    "knockout_progression"
